@@ -441,6 +441,14 @@ heading is the one inside `<em>…</em>`; the hero headline always italicises it
 
 ---
 
+### Why the site loads fast on slow internet
+* A small branded screen appears **instantly** (before any code downloads); on very slow connections it offers a "Tap to try again" button after 10 seconds.
+* The admin dashboard, the order form and the Supabase library are **separate downloads** — normal visitors only fetch what they actually need, and the order form is pre-loaded quietly in the background.
+* No animation library: reveals and drop-downs use the browser's built-in features.
+* If the database is slow or down, visitors still see the site (it keeps the last copy of your text) and orders still go through to Make.
+
+---
+
 ## Part 10 — Before-you-launch checklist
 
 Some text in the default content is **sample placeholder** — replace it before real customers see it:
@@ -477,7 +485,8 @@ src/
   pages/admin/…              ← the admin dashboard screens
   content/defaultContent.ts  ← your original copy (the starting text)
   lib/store.tsx              ← the "brain": loads/saves data (Supabase in live mode, browser in demo mode)
-  lib/supabase.ts            ← the Supabase connection
+  lib/supabase.ts            ← the Supabase connection (the big library loads only on the admin page)
+  lib/publicApi.ts           ← tiny, fast code visitors use to read the website text and send orders
   lib/integrations.ts        ← sends each lead to Make
   lib/tracking.ts            ← Meta Pixel
 ```
