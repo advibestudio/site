@@ -14,6 +14,11 @@ export function initPixel(pixelId: string) {
   const id = pixelId.trim();
   if (!id || loadedId === id || !/^\d{6,20}$/.test(id)) return;
   loadedId = id;
+  // Wait a few seconds so the pixel never competes with the page's own first load.
+  window.setTimeout(() => startPixel(id), 3500);
+}
+
+function startPixel(id: string) {
   if (!window.fbq) {
     const q: unknown[][] = [];
     const fbq: Fbq = (...args: unknown[]) => { q.push(args); };

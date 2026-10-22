@@ -1,7 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { SiteContent, Lead, Project, AuditEntry, SessionUser } from '@/content/types';
 import { defaultContent, seedLeads, seedProjects } from '@/content/defaultContent';
-import { isLive, supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { isLive, getSupabase } from '@/lib/supabase';
+import { fetchSiteContent, submitLeadRemote } from '@/lib/publicApi';
 import { sendLeadToMake } from '@/lib/integrations';
 import { initPixel, track } from '@/lib/tracking';
 
@@ -96,6 +98,10 @@ type NewLead = Omit<Lead, 'id' | 'ref' | 'date' | 'status' | 'paymentStatus'>;
 interface Store {
   mode: 'live' | 'demo';
   ready: boolean;
+  /** false until the admin page has finished checking whether you are already signed in */
+  staffReady: boolean;
+  /** called by the admin page: loads the Supabase library and restores your login */
+  initStaff: () => void;
   syncError: string;
   clearSyncError: () => void;
   content: SiteContent;
@@ -130,6 +136,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [audit, setAudit] = useState<AuditEntry[]>(() => (isLive ? [] : load(LS.audit, [])));
   const [session, setSession] = useState<SessionUser | null>(() => (isLive ? null : load(LS.session, null)));
   const [ready, setReady] = useState(!isLive);
+  const [staffReady, setStaffReady] = useState(!isLive);
+  const sbRef = useRef<SupabaseClient | null>(null);
+  const staffStarted = useRef(false);
   const [syncError, setSyncError] = useState('');
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -147,63 +156,64 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (!isLive) save(LS.audit, audit); }, [audit]);
   useEffect(() => { if (!isLive) save(LS.session, session); }, [session]);
 
-  /* ----- live mode: load public website content ----- */
+  /* ----- live mode: load public website content (never blocks the page) ----- */
   useEffect(() => {
-    if (!supabase) return;
+    if (!isLive) return;
     let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase.from('site_content').select('content').eq('id', 1).maybeSingle();
-      if (cancelled) return;
-      if (error) fail('Could not load website content', error);
-      else if (data?.content) {
-        const merged = withDefaults(data.content as Partial<SiteContent>);
+    fetchSiteContent()
+      .then((row) => {
+        if (cancelled || !row) return;
+        const merged = withDefaults(row as Partial<SiteContent>);
         setContent(merged);
         save(LS.contentCache, merged);
-      }
-      setReady(true);
-    })();
+      })
+      .catch((err) => { if (!cancelled) console.warn('Could not load website content, using saved copy', err); })
+      .finally(() => { if (!cancelled) setReady(true); });
     return () => { cancelled = true; };
-  }, [fail]);
+  }, []);
 
   /* ----- Meta Pixel (public site) ----- */
   useEffect(() => { if (content.settings.pixelId) initPixel(content.settings.pixelId); }, [content.settings.pixelId]);
 
   /* ----- live mode: staff data (only works when signed in) ----- */
   const refresh = useCallback(async () => {
-    if (!supabase || !sessionRef.current) return;
+    const sb = sbRef.current;
+    if (!sb || !sessionRef.current) return;
     const [l, p, a] = await Promise.all([
-      supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(1000),
-      supabase.from('projects').select('*').order('created_at', { ascending: false }).limit(500),
-      supabase.from('audit_log').select('*').order('at', { ascending: false }).limit(100),
+      sb.from('leads').select('*').order('created_at', { ascending: false }).limit(1000),
+      sb.from('projects').select('*').order('created_at', { ascending: false }).limit(500),
+      sb.from('audit_log').select('*').order('at', { ascending: false }).limit(100),
     ]);
     if (l.error) fail('Could not load leads', l.error); else setLeads((l.data ?? []).map(leadFromRow));
     if (p.error) fail('Could not load projects', p.error); else setProjects((p.data ?? []).map(projectFromRow));
     if (!a.error) setAudit((a.data ?? []).map((r) => ({ id: r.id, at: r.at, user: r.user_name, action: r.action })));
   }, [fail]);
 
-  const loadProfile = useCallback(async (userId: string, email: string): Promise<SessionUser | null> => {
-    if (!supabase) return null;
-    const { data } = await supabase.from('profiles').select('name, role').eq('id', userId).maybeSingle();
+  const loadProfile = useCallback(async (sb: SupabaseClient, userId: string, email: string): Promise<SessionUser | null> => {
+    const { data } = await sb.from('profiles').select('name, role').eq('id', userId).maybeSingle();
     if (!data) return null;
     return { email, name: data.name, role: data.role };
   }, []);
 
-  // Restore an existing login when the page loads.
-  useEffect(() => {
-    if (!supabase) return;
-    let cancelled = false;
-    supabase.auth.getSession().then(async ({ data }) => {
-      const u = data.session?.user;
-      if (u) {
-        const prof = await loadProfile(u.id, u.email ?? '');
-        if (!cancelled) setSession(prof);
+  // Called once by the admin page. Downloads the Supabase library and restores an existing login.
+  const initStaff = useCallback(() => {
+    if (!isLive || staffStarted.current) return;
+    staffStarted.current = true;
+    (async () => {
+      try {
+        const sb = await getSupabase();
+        sbRef.current = sb;
+        const { data } = await sb.auth.getSession();
+        const u = data.session?.user;
+        if (u) setSession(await loadProfile(sb, u.id, u.email ?? ''));
+        sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') setSession(null); });
+      } catch (err) {
+        fail('Could not reach Supabase. Check your connection and the keys', err);
+      } finally {
+        setStaffReady(true);
       }
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') setSession(null);
-    });
-    return () => { cancelled = true; sub.subscription.unsubscribe(); };
-  }, [loadProfile]);
+    })();
+  }, [fail, loadProfile]);
 
   useEffect(() => { if (isLive && session) void refresh(); }, [session, refresh]);
   useEffect(() => {
@@ -215,16 +225,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ----- audit log ----- */
   const log = useCallback((user: string, action: string) => {
-    if (supabase) {
-      void supabase.from('audit_log').insert({ user_name: user, action }).then(({ error }) => { if (error) console.warn('audit', error.message); });
+    if (sbRef.current) {
+      void sbRef.current.from('audit_log').insert({ user_name: user, action }).then(({ error }) => { if (error) console.warn('audit', error.message); });
     }
     setAudit((a) => [{ id: crypto.randomUUID(), at: new Date().toISOString(), user, action }, ...a].slice(0, 100));
   }, []);
 
   /* ----- website content ----- */
   const saveContent = useCallback(async (next: SiteContent, actor?: string, action?: string) => {
-    if (supabase) {
-      const { error } = await supabase.from('site_content').upsert({ id: 1, content: next, updated_by: actor ?? null, updated_at: new Date().toISOString() });
+    if (isLive) {
+      let sb: SupabaseClient;
+      try { sb = await getSupabase(); } catch (e) { fail('Could not save website content', e); return (e as Error).message; }
+      const { error } = await sb.from('site_content').upsert({ id: 1, content: next, updated_by: actor ?? null, updated_at: new Date().toISOString() });
       if (error) { fail('Could not save website content', error); return error.message; }
       save(LS.contentCache, next);
     }
@@ -238,22 +250,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /* ----- leads ----- */
   const addLead: Store['addLead'] = useCallback(async (input) => {
     let ref = '';
-    if (supabase) {
+    if (isLive) {
       // A database function assigns the reference number and checks the price.
-      const { data, error } = await supabase.rpc('submit_lead', {
-        p: {
+      try {
+        ref = await submitLeadRemote({
           name: input.name, business: input.business, whatsapp: input.whatsapp, email: input.email,
           offerId: input.offerId, offerName: input.offerName, price: input.price,
           industry: input.industry, product: input.product, event: input.event,
           notes: input.notes, utmSource: input.utmSource ?? null,
-        },
-      });
-      if (error || !data) {
-        console.error('submit_lead failed', error);
+        });
+      } catch (err) {
+        console.error('submit_lead failed', err);
         // Never lose the customer: make up a reference; Make/Google Sheets will still get the lead.
         ref = `AV-W${Date.now().toString(36).slice(-5).toUpperCase()}`;
-      } else {
-        ref = String(data);
       }
     } else {
       ref = `AV-${++demoRef}`;
@@ -270,27 +279,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const updateLead = useCallback((id: string, patch: Partial<Lead>, actor?: string) => {
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-    if (supabase) {
-      void supabase.from('leads').update(leadPatchToRow(patch)).eq('id', id).then(({ error }) => { if (error) fail('Could not update lead', error); });
+    if (sbRef.current) {
+      void sbRef.current.from('leads').update(leadPatchToRow(patch)).eq('id', id).then(({ error }) => { if (error) fail('Could not update lead', error); });
     }
     if (actor) log(actor, `Updated lead ${patch.status ? `status → ${patch.status}` : patch.paymentStatus ? `payment → ${patch.paymentStatus}` : ''} (${id.slice(0, 6)})`);
   }, [fail, log]);
 
   const deleteLead = useCallback((id: string) => {
     setLeads((ls) => ls.filter((l) => l.id !== id));
-    if (supabase) void supabase.from('leads').delete().eq('id', id).then(({ error }) => { if (error) fail('Could not delete lead', error); });
+    if (sbRef.current) void sbRef.current.from('leads').delete().eq('id', id).then(({ error }) => { if (error) fail('Could not delete lead', error); });
   }, [fail]);
 
   /* ----- projects ----- */
   const updateProject = useCallback((id: string, patch: Partial<Project>, actor?: string) => {
     setProjects((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    if (supabase) void supabase.from('projects').update(projectToRow(patch)).eq('id', id).then(({ error }) => { if (error) fail('Could not update project', error); });
+    if (sbRef.current) void sbRef.current.from('projects').update(projectToRow(patch)).eq('id', id).then(({ error }) => { if (error) fail('Could not update project', error); });
     if (actor) log(actor, `Updated project ${id.slice(0, 6)}`);
   }, [fail, log]);
 
   const addProject: Store['addProject'] = useCallback((p) => {
-    if (supabase) {
-      void supabase.from('projects').insert(projectToRow(p)).select().single().then(({ data, error }) => {
+    if (sbRef.current) {
+      void sbRef.current.from('projects').insert(projectToRow(p)).select().single().then(({ data, error }) => {
         if (error) fail('Could not create project', error);
         else if (data) setProjects((ps) => [projectFromRow(data), ...ps]);
       });
@@ -302,12 +311,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /* ----- sign in / out ----- */
   const signIn = useCallback(async (email: string, password: string): Promise<string | null> => {
     const mail = email.trim().toLowerCase();
-    if (supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: mail, password });
+    if (isLive) {
+      let sb: SupabaseClient;
+      try { sb = await getSupabase(); sbRef.current = sb; } catch { return 'Could not reach the server. Check your internet connection and try again.'; }
+      const { data, error } = await sb.auth.signInWithPassword({ email: mail, password });
       if (error || !data.user) return 'Incorrect email or password.';
-      const prof = await loadProfile(data.user.id, mail);
+      const prof = await loadProfile(sb, data.user.id, mail);
       if (!prof) {
-        await supabase.auth.signOut();
+        await sb.auth.signOut();
         return 'This account is not set up as team staff yet. See README.md, Part 4, step 6.';
       }
       setSession(prof);
@@ -324,19 +335,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(() => {
     setSession(null);
-    if (supabase) {
-      void supabase.auth.signOut();
+    if (sbRef.current) {
+      void sbRef.current.auth.signOut();
       setLeads([]); setProjects([]); setAudit([]);
     }
   }, []);
 
   const value = useMemo<Store>(() => ({
-    mode: isLive ? 'live' : 'demo', ready, syncError, clearSyncError: () => setSyncError(''),
+    mode: isLive ? 'live' : 'demo', ready, staffReady, initStaff, syncError, clearSyncError: () => setSyncError(''),
     content, saveContent, resetContent,
     leads, addLead, updateLead, deleteLead,
     projects, updateProject, addProject,
     audit, log, session, signIn, signOut, refresh: () => void refresh(),
-  }), [ready, syncError, content, saveContent, resetContent, leads, addLead, updateLead, deleteLead, projects, updateProject, addProject, audit, log, session, signIn, signOut, refresh]);
+  }), [ready, staffReady, initStaff, syncError, content, saveContent, resetContent, leads, addLead, updateLead, deleteLead, projects, updateProject, addProject, audit, log, session, signIn, signOut, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
