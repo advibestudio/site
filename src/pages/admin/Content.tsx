@@ -3,6 +3,7 @@ import { Check, ExternalLink, Eye, EyeOff, Plus, RotateCcw, Trash2 } from 'lucid
 import { useStore, extractYouTubeId, ytThumb } from '@/lib/store';
 import type { SiteContent, Offer, PortfolioItem } from '@/content/types';
 import { defaultContent } from '@/content/defaultContent';
+import { ClientTab, CountriesTab, CountryChips, EventsTab, SectionsTab } from './Markets';
 
 const inputCls = 'w-full rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-[#f5a524] focus:outline-none';
 const labelCls = 'mb-1.5 block text-xs font-bold uppercase tracking-widest text-white/45';
@@ -11,7 +12,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block"><span className={labelCls}>{label}</span>{children}</label>;
 }
 
-const TABS = ['Hero', 'Portfolio', 'Pricing & Offers', 'Testimonials', 'FAQs', 'Campaigns', 'Settings'] as const;
+const TABS = ['Hero', 'Portfolio', 'Pricing & Offers', 'Countries & Prices', 'Sections', 'Client', 'Events', 'Campaigns', 'Testimonials', 'FAQs', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export function ContentView({ role, actor }: { role: 'owner' | 'ops'; actor: string }) {
@@ -117,12 +118,17 @@ export function ContentView({ role, actor }: { role: 'owner' | 'ops'; actor: str
         </div>
       )}
 
+      {tab === 'Countries & Prices' && <CountriesTab draft={draft} set={set} />}
+      {tab === 'Sections' && <SectionsTab draft={draft} set={set} />}
+      {tab === 'Client' && <ClientTab draft={draft} set={set} />}
+      {tab === 'Events' && <EventsTab draft={draft} set={set} />}
+
       {tab === 'Campaigns' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-5">
             <div>
               <p className="font-semibold text-white">Top banner with countdown</p>
-              <p className="text-xs text-white/45">Shows the selected campaign's banner text and a countdown to its order-by date.</p>
+              <p className="text-xs text-white/45">Shows the selected campaign's banner text and a countdown to its order-by date. If that campaign isn't for the visitor's country, the next calendar event is used instead.</p>
             </div>
             <button onClick={() => set((d) => { d.banner.enabled = !d.banner.enabled; })}
               className={`min-h-[40px] rounded-full px-4 text-xs font-bold uppercase ${draft.banner.enabled ? 'bg-[#f5a524] text-black' : 'border border-white/20 text-white/60'}`}>
@@ -137,6 +143,7 @@ export function ContentView({ role, actor }: { role: 'owner' | 'ops'; actor: str
                 <Field label="Event date"><input type="date" className={`${inputCls} [color-scheme:dark]`} value={c.eventDate} onChange={(e) => set((d) => { d.campaigns[i].eventDate = e.target.value; })} /></Field>
                 <Field label="Order-by date"><input type="date" className={`${inputCls} [color-scheme:dark]`} value={c.orderBy} onChange={(e) => set((d) => { d.campaigns[i].orderBy = e.target.value; })} /></Field>
               </div>
+              <CountryChips countries={draft.countries} value={c.countries ?? []} onChange={(v) => set((d) => { d.campaigns[i].countries = v; })} />
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => set((d) => { d.campaigns[i].active = !d.campaigns[i].active; })} className="flex min-h-[40px] items-center gap-2 rounded-lg border border-white/15 px-3 text-xs font-semibold text-white/70">
                   {c.active ? <Eye className="h-3.5 w-3.5 text-[#f5a524]" /> : <EyeOff className="h-3.5 w-3.5" />} {c.active ? 'Active' : 'Inactive'}
@@ -171,7 +178,7 @@ export function ContentView({ role, actor }: { role: 'owner' | 'ops'; actor: str
           </Field>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Contact email"><input className={inputCls} value={draft.settings.email} onChange={(e) => set((d) => { d.settings.email = e.target.value; })} /></Field>
-            <Field label="Meta Pixel ID"><input className={inputCls} value={draft.settings.pixelId} onChange={(e) => set((d) => { d.settings.pixelId = e.target.value; })} placeholder="Optional" /></Field>
+            <Field label="Meta Pixel ID (digits only)"><input className={inputCls} inputMode="numeric" value={draft.settings.pixelId} onChange={(e) => set((d) => { d.settings.pixelId = e.target.value.replace(/[^\d]/g, ''); })} placeholder="e.g. 1234567890123456" /></Field>
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-white/50">
               <p className="font-semibold text-white/65">Make webhook</p>
               <p>Set in your hosting settings (VITE_MAKE_WEBHOOK_URL), not here. See README, Part 6.</p>
@@ -283,7 +290,10 @@ function OffersEditor({ draft, set }: { draft: SiteContent; set: (fn: (d: SiteCo
           <div key={o.id} className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Package name"><input className={inputCls} value={o.name} onChange={(e) => set((d) => { d.offers[i].name = e.target.value; })} /></Field>
-              <Field label="Price (₦, numbers only)"><input type="number" className={inputCls} value={o.price} onChange={(e) => set((d) => { d.offers[i].price = Number(e.target.value) || 0; })} /></Field>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs leading-relaxed text-white/55">
+                <p className="font-semibold text-white/75">Price</p>
+                <p>Set per country in the <strong>Countries &amp; Prices</strong> tab.</p>
+              </div>
               <Field label="Goal group">
                 <select className={inputCls} value={o.goal} onChange={(e) => set((d) => { d.offers[i].goal = e.target.value as Offer['goal']; })}>
                   <option value="one" className="bg-neutral-900">I need one great video</option>
@@ -291,7 +301,7 @@ function OffersEditor({ draft, set }: { draft: SiteContent; set: (fn: (d: SiteCo
                   <option value="monthly" className="bg-neutral-900">I want videos every month</option>
                 </select>
               </Field>
-              <Field label="Unit note"><input className={inputCls} value={o.unitNote} onChange={(e) => set((d) => { d.offers[i].unitNote = e.target.value; })} placeholder="₦19,000 per video" /></Field>
+              <Field label="Unit note (single videos only — bundles show “price per video” automatically)"><input className={inputCls} value={o.unitNote} onChange={(e) => set((d) => { d.offers[i].unitNote = e.target.value; })} placeholder="₦19,000 per video" /></Field>
               <Field label="Short description"><input className={inputCls} value={o.description} onChange={(e) => set((d) => { d.offers[i].description = e.target.value; })} /></Field>
               <Field label="Button text"><input className={inputCls} value={o.cta} onChange={(e) => set((d) => { d.offers[i].cta = e.target.value; })} /></Field>
               <Field label="Badge (optional)"><input className={inputCls} value={o.badge ?? ''} onChange={(e) => set((d) => { d.offers[i].badge = e.target.value || undefined; })} placeholder="Most popular" /></Field>

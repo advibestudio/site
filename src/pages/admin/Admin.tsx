@@ -3,7 +3,8 @@ import {
   LayoutDashboard, Users, FolderKanban, Globe, LogOut, ExternalLink,
   AlertTriangle, Clock, TrendingUp, Wallet, Lock,
 } from 'lucide-react';
-import { useStore, fmtNaira } from '@/lib/store';
+import { useStore } from '@/lib/store';
+import { fmtMoney } from '@/lib/money';
 import { LeadsView, ProjectsView } from './LeadsProjects';
 import { ContentView } from './Content';
 
@@ -53,7 +54,13 @@ function SignIn() {
 
 /* ---------- DASHBOARD ---------- */
 function Dashboard({ go }: { go: (v: View) => void }) {
-  const { leads, projects, audit, session } = useStore();
+  const { leads, projects, audit, session, content } = useStore();
+  // Money is never added across currencies: each currency gets its own total.
+  const symbolOf = (cur: string) => content.countries.find((c) => c.currency === cur)?.symbol ?? `${cur} `;
+  const paid = leads.filter((l) => l.paymentStatus === 'Paid');
+  const byCur = paid.reduce<Record<string, number>>((m, l) => { m[l.currency] = (m[l.currency] ?? 0) + l.price; return m; }, {});
+  const revenue = Object.entries(byCur).map(([cur, v]) => fmtMoney(v, { symbol: symbolOf(cur) })).join('  ·  ') || '—';
+  const byCountry = content.countries.map((c) => ({ c, n: leads.filter((l) => l.country === c.code).length })).filter((x) => x.n > 0);
   const today = new Date().toISOString().slice(0, 10);
   const inWeek = (d: string) => {
     const diff = (new Date(d).getTime() - Date.now()) / 86400000;
@@ -63,7 +70,7 @@ function Dashboard({ go }: { go: (v: View) => void }) {
     { label: 'New leads today', value: String(leads.filter((l) => l.date === today).length), icon: TrendingUp, action: () => go('leads') },
     { label: 'Total leads', value: String(leads.length), icon: Users, action: () => go('leads') },
     { label: 'Due this week', value: String(projects.filter((p) => p.status !== 'Closed' && inWeek(p.deadline)).length), icon: Clock, action: () => go('projects') },
-    { label: 'Revenue (won/paid)', value: fmtNaira(leads.filter((l) => l.paymentStatus === 'Paid').reduce((s, l) => s + l.price, 0)), icon: Wallet, action: () => go('leads') },
+    { label: 'Revenue (won/paid)', value: revenue, icon: Wallet, action: () => go('leads') },
   ];
   const overdue = projects.filter((p) => p.status !== 'Closed' && new Date(p.deadline) < new Date());
   const unpaidStarted = projects.filter((p) => p.startedUnpaid && p.payment !== 'Paid');
@@ -78,11 +85,22 @@ function Dashboard({ go }: { go: (v: View) => void }) {
         {stats.map((s) => (
           <button key={s.label} onClick={s.action} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-left transition hover:border-[#f5a524]/50">
             <s.icon className="h-5 w-5 text-[#f5a524]" />
-            <p className="mt-3 font-display text-2xl text-white">{s.value}</p>
+            <p className={`mt-3 font-display text-white ${s.value.length > 14 ? 'text-base leading-snug' : 'text-2xl'}`}>{s.value}</p>
             <p className="text-xs uppercase tracking-widest text-white/45">{s.label}</p>
           </button>
         ))}
       </div>
+
+      {byCountry.length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <p className="mb-3 font-display uppercase text-white">Leads by country</p>
+          <div className="flex flex-wrap gap-2">
+            {byCountry.map(({ c, n }) => (
+              <button key={c.code} onClick={() => go('leads')} className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:border-[#f5a524]">{c.flag} {c.name} <strong className="ml-1 text-[#f5a524]">{n}</strong></button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {overdue.length > 0 && (
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-5">
