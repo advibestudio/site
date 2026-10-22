@@ -404,3 +404,23 @@ body.is-public {
 @media (max-width: 639px) {
   .site-actions .btn-studio { display: none; }
 }
+
+/* ---------- lightweight animations (replace the old animation library) ---------- */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s var(--ease-out), transform .7s var(--ease-out); }
+.reveal.is-in { opacity: 1; transform: none; }
+.fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s var(--ease-out); }
+.fold.is-open { grid-template-rows: 1fr; }
+.fold > div { min-height: 0; overflow: hidden; }
+@keyframes pop-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes slide-in { from { opacity: 0; transform: translateY(40px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes step-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+.anim-pop { animation: pop-in .3s var(--ease-out) both; }
+.anim-slide { animation: slide-in .35s var(--ease-out) both; }
+.anim-step { animation: step-in .22s var(--ease-out) both; }
+.anim-rise { animation: rise-in .4s var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { transform: none; transition: opacity .3s; }
+  .fold { transition: none; }
+  .anim-pop, .anim-slide, .anim-step, .anim-rise { animation: none; }
+}
