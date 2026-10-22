@@ -1,4 +1,5 @@
 import type { Lead } from '@/content/types';
+import { getParam } from '@/lib/money';
 
 /**
  * MAKE.COM CONNECTION
@@ -14,10 +15,9 @@ const WEBHOOK = (import.meta.env.VITE_MAKE_WEBHOOK_URL as string | undefined)?.t
 
 export const makeConfigured = Boolean(WEBHOOK);
 
-export function sendLeadToMake(lead: Lead): void {
+export function sendLeadToMake(lead: Lead, countryName = ''): void {
   if (!WEBHOOK) return;
   const [first, ...rest] = lead.name.trim().split(/\s+/);
-  const params = new URLSearchParams(window.location.search);
 
   // Flat key/value pairs. Make turns each one into a field you can map.
   const fields: Record<string, string> = {
@@ -31,14 +31,19 @@ export function sendLeadToMake(lead: Lead): void {
     email: lead.email,
     package_id: lead.offerId,
     package_name: lead.offerName,
-    price_ngn: String(lead.price),
+    country: lead.country,
+    country_name: countryName,
+    currency: lead.currency,
+    price: String(lead.price),
+    source: lead.source,
+    show_public: lead.showPublic ? 'yes' : 'no',
     industry: lead.industry,
     product: lead.product,
     event: lead.event,
     notes: lead.notes,
-    utm_source: params.get('utm_source') ?? '',
-    utm_medium: params.get('utm_medium') ?? '',
-    utm_campaign: params.get('utm_campaign') ?? '',
+    utm_source: getParam('utm_source') ?? '',
+    utm_medium: getParam('utm_medium') ?? '',
+    utm_campaign: getParam('utm_campaign') ?? '',
     page_url: window.location.href.split('#')[0],
   };
 

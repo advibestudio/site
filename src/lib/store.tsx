@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { SiteContent, Lead, Project, AuditEntry, SessionUser } from '@/content/types';
-import { defaultContent, seedLeads, seedProjects } from '@/content/defaultContent';
+import { defaultContent, defaultCountries, seedLeads, seedProjects } from '@/content/defaultContent';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isLive, getSupabase } from '@/lib/supabase';
 import { fetchSiteContent, submitLeadRemote } from '@/lib/publicApi';
 import { sendLeadToMake } from '@/lib/integrations';
-import { initPixel, track } from '@/lib/tracking';
+import { track } from '@/lib/tracking';
 
 /* ==========================================================================
    THE STORE — where all the site's data lives.
@@ -41,16 +41,39 @@ function save(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ }
 }
 
-/** Fill in any fields missing from saved content (e.g. after we add a new setting). */
+/**
+ * Fill in anything missing from saved content, so sites saved BEFORE a feature existed keep working.
+ * (e.g. content saved before "countries" existed gets the default countries, with your existing
+ * Nigerian prices carried over.)
+ */
 function withDefaults(c: Partial<SiteContent> | null | undefined): SiteContent {
   if (!c) return defaultContent;
-  return {
+  const merged = {
     ...defaultContent,
     ...c,
     brand: { ...defaultContent.brand, ...c.brand },
     settings: { ...defaultContent.settings, ...c.settings },
     hero: { ...defaultContent.hero, ...c.hero },
+    events: { ...defaultContent.events, ...c.events },
+    sections: { ...defaultContent.sections, ...(c.sections ?? {}) },
+    client: { ...defaultContent.client, ...(c.client ?? {}) },
+    popups: { ...defaultContent.popups, ...(c.popups ?? {}) },
   } as SiteContent;
+
+  if (!c.countries?.length) {
+    const ngPrices = Object.fromEntries((c.offers ?? []).map((o) => [o.id, o.price]));
+    merged.countries = defaultCountries.map((k) =>
+      k.code === 'NG' ? { ...k, prices: { ...k.prices, ...ngPrices } } : { ...k, prices: { ...k.prices } });
+    // first time on this version: also bring in the country-specific starter events
+    const have = new Set((c.campaigns ?? []).map((x) => x.id));
+    const defById = Object.fromEntries(defaultContent.campaigns.map((x) => [x.id, x]));
+    merged.campaigns = [
+      ...(c.campaigns ?? []).map((x) => (x.countries === undefined && defById[x.id]?.countries ? { ...x, countries: defById[x.id].countries } : x)),
+      ...defaultContent.campaigns.filter((x) => !have.has(x.id)),
+    ];
+  }
+  merged.defaultCountry = c.defaultCountry || 'NG';
+  return merged;
 }
 
 /* ---------- database row <-> app object converters ---------- */
@@ -62,6 +85,13 @@ const leadFromRow = (r: Row): Lead => ({
   offerId: r.offer_id ?? '', offerName: r.offer_name ?? '', price: Number(r.price ?? 0),
   industry: r.industry ?? '', product: r.product ?? '', event: r.event ?? 'None', notes: r.notes ?? '',
   status: r.status, paymentStatus: r.payment_status, utmSource: r.utm_source ?? undefined,
+  country: r.country ?? 'NG', currency: r.currency ?? 'NGN', source: r.source ?? 'website', showPublic: Boolean(r.show_public),
+});
+const leadToRow = (l: Omit<Lead, 'id' | 'ref' | 'date'>): Row => ({
+  name: l.name, business: l.business, whatsapp: l.whatsapp, email: l.email,
+  offer_id: l.offerId, offer_name: l.offerName, price: l.price, industry: l.industry,
+  product: l.product, event: l.event, notes: l.notes, status: l.status, payment_status: l.paymentStatus,
+  utm_source: l.utmSource ?? null, country: l.country, currency: l.currency, source: l.source, show_public: l.showPublic,
 });
 const leadPatchToRow = (p: Partial<Lead>): Row => {
   const m: Row = {};
@@ -94,6 +124,7 @@ const projectToRow = (p: Partial<Project>): Row => {
 };
 
 type NewLead = Omit<Lead, 'id' | 'ref' | 'date' | 'status' | 'paymentStatus'>;
+type ManualLead = Omit<Lead, 'id' | 'ref' | 'date'>;
 
 interface Store {
   mode: 'live' | 'demo';
@@ -109,7 +140,9 @@ interface Store {
   saveContent: (next: SiteContent, actor?: string, action?: string) => Promise<string | null>;
   resetContent: () => Promise<string | null>;
   leads: Lead[];
-  addLead: (lead: NewLead) => Promise<Lead>;
+  addLead: (lead: NewLead, countryName?: string) => Promise<Lead>;
+  /** Staff only: type in an order that came from outside the website (WhatsApp, a call, a referral…). */
+  addManualLead: (lead: ManualLead, opts: { sendToMake: boolean; countryName?: string }) => Promise<string | null>;
   updateLead: (id: string, patch: Partial<Lead>, actor?: string) => void;
   deleteLead: (id: string) => void;
   projects: Project[];
@@ -171,9 +204,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .finally(() => { if (!cancelled) setReady(true); });
     return () => { cancelled = true; };
   }, []);
-
-  /* ----- Meta Pixel (public site) ----- */
-  useEffect(() => { if (content.settings.pixelId) initPixel(content.settings.pixelId); }, [content.settings.pixelId]);
 
   /* ----- live mode: staff data (only works when signed in) ----- */
   const refresh = useCallback(async () => {
@@ -248,7 +278,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const resetContent = useCallback(() => saveContent(defaultContent), [saveContent]);
 
   /* ----- leads ----- */
-  const addLead: Store['addLead'] = useCallback(async (input) => {
+  const addLead: Store['addLead'] = useCallback(async (input, countryName) => {
     let ref = '';
     if (isLive) {
       // A database function assigns the reference number and checks the price.
@@ -258,6 +288,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           offerId: input.offerId, offerName: input.offerName, price: input.price,
           industry: input.industry, product: input.product, event: input.event,
           notes: input.notes, utmSource: input.utmSource ?? null,
+          countryCode: input.country, currency: input.currency, showPublic: input.showPublic,
         });
       } catch (err) {
         console.error('submit_lead failed', err);
@@ -272,8 +303,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       status: 'New', paymentStatus: 'Unpaid',
     };
     if (!isLive) setLeads((ls) => [full, ...ls]);
-    sendLeadToMake(full);
-    track('Lead', { value: full.price, currency: 'NGN', content_name: full.offerName });
+    sendLeadToMake(full, countryName);
+    track('Lead', { value: full.price, currency: full.currency, content_name: full.offerName });
     return full;
   }, []);
 
@@ -289,6 +320,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setLeads((ls) => ls.filter((l) => l.id !== id));
     if (sbRef.current) void sbRef.current.from('leads').delete().eq('id', id).then(({ error }) => { if (error) fail('Could not delete lead', error); });
   }, [fail]);
+
+  const addManualLead: Store['addManualLead'] = useCallback(async (input, opts) => {
+    let full: Lead;
+    if (isLive) {
+      const sb = sbRef.current;
+      if (!sb) return 'Not connected to the database yet — refresh the page and sign in again.';
+      const { data, error } = await sb.from('leads').insert(leadToRow(input)).select().single();
+      if (error || !data) { fail('Could not add the order', error); return error?.message ?? 'Could not add the order'; }
+      full = leadFromRow(data);
+    } else {
+      full = { ...input, id: crypto.randomUUID(), ref: `AV-${++demoRef}`, date: new Date().toISOString().slice(0, 10) };
+    }
+    setLeads((ls) => [full, ...ls]);
+    if (opts.sendToMake) sendLeadToMake(full, opts.countryName);
+    log(sessionRef.current?.name ?? 'Team', `Added a manual order ${full.ref} (${full.source})`);
+    return null;
+  }, [fail, log]);
 
   /* ----- projects ----- */
   const updateProject = useCallback((id: string, patch: Partial<Project>, actor?: string) => {
@@ -344,10 +392,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<Store>(() => ({
     mode: isLive ? 'live' : 'demo', ready, staffReady, initStaff, syncError, clearSyncError: () => setSyncError(''),
     content, saveContent, resetContent,
-    leads, addLead, updateLead, deleteLead,
+    leads, addLead, addManualLead, updateLead, deleteLead,
     projects, updateProject, addProject,
     audit, log, session, signIn, signOut, refresh: () => void refresh(),
-  }), [ready, staffReady, initStaff, syncError, content, saveContent, resetContent, leads, addLead, updateLead, deleteLead, projects, updateProject, addProject, audit, log, session, signIn, signOut, refresh]);
+  }), [ready, staffReady, initStaff, syncError, content, saveContent, resetContent, leads, addLead, addManualLead, updateLead, deleteLead, projects, updateProject, addProject, audit, log, session, signIn, signOut, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -372,3 +420,5 @@ export function extractYouTubeId(url: string): string {
   const m = url.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{6,})/);
   return m ? m[1] : url.trim();
 }
+
+export { fmtMoney } from '@/lib/money';

@@ -42,3 +42,16 @@ export async function submitLeadRemote(payload: Record<string, unknown>): Promis
   if (!res.ok) throw new Error(`Order request failed (${res.status})`);
   return String(await res.json());
 }
+
+export interface RecentOrder { first_name: string; country: string; created_at: string }
+
+/** Who recently started an order (first name + country only, and only people who agreed). */
+export async function fetchRecentOrders(hours: number, limit = 10): Promise<RecentOrder[]> {
+  const res = await timedFetch(
+    `${SUPABASE_URL}/rest/v1/rpc/recent_orders`,
+    { method: 'POST', headers: headers(), body: JSON.stringify({ lim: limit, hours }) },
+    8000,
+  );
+  if (!res.ok) throw new Error(`Recent orders request failed (${res.status})`);
+  return (await res.json()) as RecentOrder[];
+}
