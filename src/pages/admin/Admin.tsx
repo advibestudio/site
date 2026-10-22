@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, Globe, LogOut, ExternalLink,
   AlertTriangle, Clock, TrendingUp, Wallet, Lock,
@@ -27,7 +26,7 @@ function SignIn() {
   const inputCls = 'w-full rounded-lg border border-white/15 bg-white/5 px-4 py-3.5 text-base text-white placeholder:text-white/35 focus:border-[#f5a524] focus:outline-none';
   return (
     <div className="grid min-h-dvh place-items-center bg-[#0b0b0c] px-4">
-      <motion.form onSubmit={submit} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#121214] p-8">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#121214] p-8">
         <p className="font-display text-2xl tracking-tight text-white">AdVibe<span className="text-[#f5a524]">.</span></p>
         <p className="mt-1 flex items-center gap-2 text-sm text-white/50"><Lock className="h-3.5 w-3.5" /> Admin sign-in</p>
         <div className="mt-7 space-y-4">
@@ -47,7 +46,7 @@ function SignIn() {
           </div>
         )}
         <a href="#/" className="mt-4 block text-center text-xs text-white/40 transition hover:text-white/70">← Back to website</a>
-      </motion.form>
+      </form>
     </div>
   );
 }
@@ -135,8 +134,10 @@ function Dashboard({ go }: { go: (v: View) => void }) {
 
 /* ---------- ADMIN SHELL ---------- */
 export default function Admin() {
-  const { session, signOut, mode, syncError, clearSyncError } = useStore();
+  const { session, signOut, mode, syncError, clearSyncError, staffReady, initStaff } = useStore();
   const [view, setView] = useState<View>('dashboard');
+  // Starts the (lazy) connection to Supabase and restores an existing login.
+  useEffect(() => { initStaff(); }, [initStaff]);
   const tabs = useMemo(() => {
     const t: { id: View; label: string; icon: React.ElementType }[] = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -147,6 +148,9 @@ export default function Admin() {
     return t;
   }, []);
 
+  if (!staffReady) {
+    return <div className="grid min-h-dvh place-items-center bg-[#0b0b0c] text-sm text-white/50">Connecting…</div>;
+  }
   if (!session) return <SignIn />;
 
   return (
