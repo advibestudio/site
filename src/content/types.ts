@@ -38,6 +38,42 @@ export interface Campaign {
   orderBy: string; // ISO
   bannerText: string;
   active: boolean;
+  /** Country codes this event is shown in (e.g. ['NG','GH']). Empty/missing = every country. */
+  countries?: string[];
+}
+
+/** One market you sell to. Each has its own prices, currency, payment details and web link. */
+export interface Country {
+  code: string;              // 'NG', 'GH', 'KE', 'US', 'UK'
+  slug: string;              // used in the ad link: https://yoursite/#/gh
+  name: string;
+  flag: string;              // emoji flag
+  currency: string;          // 'NGN', 'GHS', 'KES', 'USD', 'GBP'
+  symbol: string;            // '₦', 'GH₵', 'KSh', '$', '£'
+  active: boolean;           // switch a whole country on/off
+  /** Price of each package in this country's currency, keyed by offer id. Missing = package hidden here. */
+  prices: Record<string, number>;
+  whatsappNumber: string;    // blank = use the main number from Settings
+  paymentInstructions: string; // blank = use the main text from Settings
+  pixelId: string;           // blank = use the main Meta Pixel from Settings
+}
+
+export type SectionKey =
+  | 'wall' | 'proof' | 'showcase' | 'clients' | 'problem' | 'services'
+  | 'events' | 'whyUs' | 'process' | 'testimonials' | 'faq' | 'finalCta' | 'liveToasts';
+
+export interface FeaturedClient {
+  name: string;              // short display name, e.g. CirclesFundMe
+  legalName: string;         // full registered name
+  sector: string;            // e.g. Fintech
+  logo: string;              // full logo image (path inside the site, or a web address)
+  mark: string;              // small square icon for badges
+  badge: string;             // e.g. Repeat client
+  heading: string;
+  body: string;
+  points: string[];
+  /** Portfolio videos whose "Client" field contains this text are shown inside the spotlight. */
+  matchName: string;
 }
 
 export interface Testimonial {
@@ -63,6 +99,11 @@ export interface SiteContent {
     paymentInstructions: string;
     deliveryDays: number;
   };
+  countries: Country[];
+  defaultCountry: string;    // country code shown when a visitor arrives on the plain link
+  sections: Record<SectionKey, boolean>;
+  client: FeaturedClient;
+  popups: { delaySeconds: number; gapSeconds: number; maxPerVisit: number; withinHours: number };
   banner: { enabled: boolean; campaignId: string };
   hero: {
     headline: string;
@@ -73,7 +114,17 @@ export interface SiteContent {
   };
   problem: { heading: string; lines: string[]; transition: string };
   services: { id: string; title: string; description: string }[];
-  events: { heading: string; subheading: string; body: string; cta: string };
+  events: {
+    heading: string; subheading: string; body: string; cta: string;
+    /** Pull public holidays automatically from a free calendar API (Nager.Date). */
+    auto: boolean;
+    /** Add built-in shopping dates (Black Friday, Cyber Monday, Valentine's, Mother's/Father's Day …). */
+    builtin: boolean;
+    maxItems: number;      // how many upcoming events to show
+    windowDays: number;    // only look this many days ahead
+    leadDays: number;      // "order by" = event date minus this many days
+    hide: string;          // comma-separated words; events containing any of them are not shown
+  };
   campaigns: Campaign[];
   portfolio: PortfolioItem[];
   categories: string[];
@@ -111,6 +162,10 @@ export interface Lead {
   status: LeadStatus;
   paymentStatus: 'Unpaid' | 'Deposit' | 'Paid';
   utmSource?: string;
+  country: string;      // country code, e.g. 'GH'
+  currency: string;     // currency code the price is in, e.g. 'GHS'
+  source: string;       // 'website' or where a manually-entered order came from
+  showPublic: boolean;  // customer agreed to appear in the "just started" pop-up
 }
 
 export type ProjectStatus =

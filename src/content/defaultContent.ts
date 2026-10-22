@@ -1,4 +1,19 @@
-import type { SiteContent, Lead, Project } from './types';
+import type { SiteContent, Lead, Project, Country } from './types';
+
+const IDS = ['single-30', 'single-60', 'bundle-5', 'bundle-10', 'monthly-studio'];
+const priceMap = (nums: number[]): Record<string, number> => Object.fromEntries(IDS.map((id, i) => [id, nums[i]]));
+
+/**
+ * STARTING COUNTRIES. The Nigerian prices are your original ones. The prices for the other
+ * countries are PLACEHOLDERS — set your real prices in Admin → Website → Countries & Prices.
+ */
+export const defaultCountries: Country[] = [
+  { code: 'NG', slug: 'ng', name: 'Nigeria', flag: '🇳🇬', currency: 'NGN', symbol: '₦', active: true, prices: priceMap([25000, 35000, 95000, 185000, 250000]), whatsappNumber: '', paymentInstructions: '', pixelId: '' },
+  { code: 'GH', slug: 'gh', name: 'Ghana', flag: '🇬🇭', currency: 'GHS', symbol: 'GH₵', active: true, prices: priceMap([250, 350, 950, 1850, 2500]), whatsappNumber: '', paymentInstructions: 'Mobile Money (MTN MoMo): 024 XXX XXXX — Name: AdVibe Studio. Use your reference code as the payment note, then send proof on WhatsApp.', pixelId: '' },
+  { code: 'KE', slug: 'ke', name: 'Kenya', flag: '🇰🇪', currency: 'KES', symbol: 'KSh', active: true, prices: priceMap([3500, 4900, 13500, 26000, 35000]), whatsappNumber: '', paymentInstructions: 'M-Pesa Paybill XXXXXX, Account: your reference code. Then send the M-Pesa confirmation message on WhatsApp.', pixelId: '' },
+  { code: 'US', slug: 'us', name: 'United States', flag: '🇺🇸', currency: 'USD', symbol: '$', active: true, prices: priceMap([79, 119, 349, 649, 899]), whatsappNumber: '', paymentInstructions: 'We will send you an invoice with a secure payment link on WhatsApp or email. Quote your reference code.', pixelId: '' },
+  { code: 'UK', slug: 'uk', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP', symbol: '£', active: true, prices: priceMap([59, 89, 269, 499, 699]), whatsappNumber: '', paymentInstructions: 'We will send you an invoice with a secure payment link on WhatsApp or email. Quote your reference code.', pixelId: '' },
+];
 
 export const defaultContent: SiteContent = {
   brand: {
@@ -17,6 +32,25 @@ export const defaultContent: SiteContent = {
       'Bank transfer — AdVibe Studio, GTBank 0123456789. Use your reference code as narration, then send proof on WhatsApp.',
     deliveryDays: 5,
   },
+  countries: defaultCountries,
+  defaultCountry: 'NG',
+  sections: {
+    wall: true, proof: true, showcase: true, clients: true, problem: true, services: true,
+    events: true, whyUs: true, process: true, testimonials: true, faq: true, finalCta: true, liveToasts: true,
+  },
+  client: {
+    name: 'CirclesFundMe',
+    legalName: 'CirclesFundMe Digital Savings and Loans Cooperative Society Limited',
+    sector: 'Fintech',
+    logo: 'clients/circlesfundme.webp',
+    mark: 'clients/circlesfundme-mark.webp',
+    badge: 'Repeat client',
+    heading: 'A fintech that keeps coming back to us.',
+    body: 'CirclesFundMe Digital Savings and Loans Cooperative Society Limited is one of our major clients. We have produced campaign after campaign for them — because we deliver.',
+    points: ['Many campaigns delivered', 'A repeat client — they keep coming back'],
+    matchName: 'CirclesFundMe',
+  },
+  popups: { delaySeconds: 8, gapSeconds: 16, maxPerVisit: 6, withinHours: 72 },
   banner: { enabled: true, campaignId: 'black-friday' },
   hero: {
     headline: 'Ads that turn attention into orders.',
@@ -53,14 +87,25 @@ export const defaultContent: SiteContent = {
     subheading: 'A sale. A product launch. An event. A new service. A campaign.',
     body: "Sales seasons are won before they start. The businesses that launch their ads early get the cheapest clicks and the most orders. Don't wait until the week before to start creating your ads.",
     cta: 'Create my campaign videos',
+    auto: true,
+    builtin: true,
+    maxItems: 6,
+    windowDays: 150,
+    leadDays: 10,
+    hide: '',
   },
   campaigns: [
     { id: 'black-friday', name: 'Black Friday', eventDate: '2026-11-27', orderBy: '2026-11-20', bannerText: 'Black Friday is coming. Order by Nov 20 to launch on time.', active: true },
-    { id: 'detty-december', name: 'Christmas & Detty December', eventDate: '2026-12-20', orderBy: '2026-12-10', bannerText: 'Detty December sells out early. Lock in your campaign videos now.', active: true },
+    { id: 'detty-december', name: 'Christmas & Detty December', eventDate: '2026-12-20', orderBy: '2026-12-10', bannerText: 'Detty December sells out early. Lock in your campaign videos now.', active: true, countries: ['NG', 'GH'] },
     { id: 'valentines', name: "Valentine's", eventDate: '2027-02-14', orderBy: '2027-02-05', bannerText: "Valentine's rush starts in January. Be ready.", active: true },
-    { id: 'ramadan', name: 'Ramadan & Eid', eventDate: '2027-03-20', orderBy: '2027-03-10', bannerText: 'Ramadan & Eid campaigns perform best when launched early.', active: true },
+    { id: 'ramadan', name: 'Ramadan & Eid', eventDate: '2027-03-20', orderBy: '2027-03-10', bannerText: 'Ramadan & Eid campaigns perform best when launched early.', active: true, countries: ['NG', 'GH', 'KE', 'UK'] },
     { id: 'easter', name: 'Easter', eventDate: '2027-03-28', orderBy: '2027-03-19', bannerText: 'Easter promo season is almost here.', active: true },
-    { id: 'independence', name: 'Independence Day', eventDate: '2027-10-01', orderBy: '2027-09-24', bannerText: 'October 1st campaigns — order early.', active: true },
+    { id: 'independence', name: 'Independence Day', eventDate: '2027-10-01', orderBy: '2027-09-24', bannerText: 'October 1st campaigns — order early.', active: true, countries: ['NG'] },
+    { id: 'thanksgiving', name: 'Thanksgiving week', eventDate: '2026-11-26', orderBy: '2026-11-19', bannerText: 'Thanksgiving and Black Friday week is here. Order by Nov 19 to launch on time.', active: true, countries: ['US'] },
+    { id: 'boxing-day', name: 'Christmas & Boxing Day sales', eventDate: '2026-12-26', orderBy: '2026-12-16', bannerText: 'Boxing Day sales start early. Lock in your videos now.', active: true, countries: ['UK'] },
+    { id: 'jamhuri', name: 'Jamhuri Day & festive season', eventDate: '2026-12-12', orderBy: '2026-12-02', bannerText: 'The festive season sells out early. Lock in your campaign videos now.', active: true, countries: ['KE'] },
+    { id: 'gh-independence', name: 'Ghana Independence Day', eventDate: '2027-03-06', orderBy: '2027-02-24', bannerText: 'March 6th campaigns — order early.', active: true, countries: ['GH'] },
+    { id: 'july-4', name: 'Fourth of July', eventDate: '2027-07-04', orderBy: '2027-06-24', bannerText: 'July 4th promos — order early.', active: true, countries: ['US'] },
   ],
   portfolio: [
     { id: 'p1', title: 'Glow Serum Launch', client: 'Skincare brand', category: 'Product Ads', youtubeId: 'aqz-KE-bpKQ', orientation: 'vertical', result: '3.2x ROAS on Meta', featured: true, visible: true, order: 1 },
@@ -175,9 +220,9 @@ export const defaultContent: SiteContent = {
 };
 
 export const seedLeads: Lead[] = [
-  { id: 'l1', ref: 'AV-1042', date: '2026-10-19', name: 'John Doe', business: 'ABC Fashion', whatsapp: '2348098765432', email: 'john@abcfashion.ng', offerId: 'bundle-5', offerName: '5 Creative Test Pack', price: 95000, industry: 'Fashion', product: 'Ankara two-piece sets', event: 'Black Friday', notes: 'Wants UGC style hooks', status: 'Qualified', paymentStatus: 'Deposit', utmSource: 'facebook' },
-  { id: 'l2', ref: 'AV-1043', date: '2026-10-20', name: 'Ngozi U.', business: 'GlowUp Skincare', whatsapp: '2347011122233', email: 'ngozi@glowup.ng', offerId: 'single-30', offerName: 'Single 30s Video', price: 25000, industry: 'Beauty', product: 'Vitamin C serum', event: 'None', notes: '', status: 'New', paymentStatus: 'Unpaid', utmSource: 'instagram' },
-  { id: 'l3', ref: 'AV-1041', date: '2026-10-15', name: 'Emeka O.', business: 'GadgetHub', whatsapp: '2349033344455', email: 'emeka@gadgethub.ng', offerId: 'monthly-studio', offerName: 'Monthly Studio', price: 250000, industry: 'Electronics', product: 'Phone accessories', event: 'Detty December', notes: 'Renews monthly', status: 'Won', paymentStatus: 'Paid', utmSource: 'whatsapp' },
+  { id: 'l1', ref: 'AV-1042', date: '2026-10-19', name: 'John Doe', business: 'ABC Fashion', whatsapp: '2348098765432', email: 'john@abcfashion.ng', offerId: 'bundle-5', offerName: '5 Creative Test Pack', price: 95000, industry: 'Fashion', product: 'Ankara two-piece sets', event: 'Black Friday', notes: 'Wants UGC style hooks', status: 'Qualified', paymentStatus: 'Deposit', utmSource: 'facebook', country: 'NG', currency: 'NGN', source: 'website', showPublic: false },
+  { id: 'l2', ref: 'AV-1043', date: '2026-10-20', name: 'Ngozi U.', business: 'GlowUp Skincare', whatsapp: '2347011122233', email: 'ngozi@glowup.ng', offerId: 'single-30', offerName: 'Single 30s Video', price: 25000, industry: 'Beauty', product: 'Vitamin C serum', event: 'None', notes: '', status: 'New', paymentStatus: 'Unpaid', utmSource: 'instagram', country: 'NG', currency: 'NGN', source: 'website', showPublic: false },
+  { id: 'l3', ref: 'AV-1041', date: '2026-10-15', name: 'Emeka O.', business: 'GadgetHub', whatsapp: '2349033344455', email: 'emeka@gadgethub.ng', offerId: 'monthly-studio', offerName: 'Monthly Studio', price: 250000, industry: 'Electronics', product: 'Phone accessories', event: 'Detty December', notes: 'Renews monthly', status: 'Won', paymentStatus: 'Paid', utmSource: 'whatsapp', country: 'NG', currency: 'NGN', source: 'website', showPublic: false },
 ];
 
 export const seedProjects: Project[] = [
