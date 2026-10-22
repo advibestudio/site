@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, ArrowLeft, CheckCircle2, MessageCircle, Copy, Check, Loader2 } from 'lucide-react';
 import { useStore, fmtNaira, waLink } from '@/lib/store';
 import { track } from '@/lib/tracking';
@@ -81,11 +80,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
 
   return (
     <div className="overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Order form">
-      <motion.div
-        initial={{ opacity: 0, y: 40, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
-        className="modal" onClick={(e) => e.stopPropagation()}
-      >
+      <div className="modal anim-slide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-top">
           <div>
             <p className="modal-kicker">{done ? 'Order received' : offer ? 'Your package' : 'Start your order'}</p>
@@ -132,8 +127,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
               ))}
             </div>
 
-            <AnimatePresence mode="wait">
-              <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }} className="form-stack">
+            <div key={step} className="form-stack anim-step">
                 {step === 0 && (
                   <>
                     <input className="field" placeholder="Full name *" value={form.name} onChange={(e) => set('name', e.target.value)} autoComplete="name" />
@@ -177,8 +171,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
                     </p>
                   </div>
                 )}
-              </motion.div>
-            </AnimatePresence>
+            </div>
 
             {errors.length > 0 && <div className="err-box">{errors.map((e) => <p key={e}>{e}</p>)}</div>}
 
@@ -195,7 +188,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
             </div>
           </>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,21 +1,40 @@
-import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
 import { Play, X } from 'lucide-react';
 import { ytThumb } from '@/lib/store';
 import type { PortfolioItem } from '@/content/types';
 
-/** Fade-and-rise when scrolled into view. */
+/**
+ * Fade-and-rise when scrolled into view. Uses the browser's built-in
+ * IntersectionObserver + a CSS transition (no animation library = faster load).
+ * A safety timer guarantees content always appears, even if the observer never fires.
+ */
 export function Reveal({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!('IntersectionObserver' in window)) { setShown(true); return; }
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setShown(true); io.disconnect(); }
+    }, { rootMargin: '0px 0px -60px 0px' });
+    io.observe(el);
+    const safety = setTimeout(() => setShown(true), 8000);
+    return () => { io.disconnect(); clearTimeout(safety); };
+  }, []);
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.7, delay, ease: [0.2, 0.8, 0.2, 1] }}
-    >
+    <div ref={ref} className={`reveal ${shown ? 'is-in' : ''} ${className}`} style={delay ? { transitionDelay: `${delay}s` } : undefined}>
       {children}
-    </motion.div>
+    </div>
+  );
+}
+
+/** Smooth open/close panel (used by FAQs and package drawers). Pure CSS. */
+export function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`fold ${open ? 'is-open' : ''}`} aria-hidden={!open} inert={!open}>
+      <div>{children}</div>
+    </div>
   );
 }
 
@@ -76,11 +95,8 @@ export function Lightbox({ item, onClose }: { item: PortfolioItem | null; onClos
   return (
     <div className="lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Video: ${item.title}`}>
       <button onClick={onClose} className="lightbox-close" aria-label="Close video"><X size={22} /></button>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-        className="lightbox-box"
+      <div
+        className="lightbox-box anim-pop"
         style={{ maxWidth: vertical ? 380 : 900 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -100,7 +116,7 @@ export function Lightbox({ item, onClose }: { item: PortfolioItem | null; onClos
           </div>
           {item.result && <span style={{ flex: 'none', padding: '6px 12px', borderRadius: 999, background: 'rgb(var(--brand))', color: 'rgb(var(--ink))', fontSize: 13, fontWeight: 700 }}>{item.result}</span>}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
