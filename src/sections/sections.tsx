@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ChevronDown, MessageCircle, Check, CalendarDays, Plus, Package, Briefcase, Sparkles, Clapperboard, PartyPopper, Tv } from 'lucide-react';
 import { useStore, fmtNaira, waLink } from '@/lib/store';
 import { track } from '@/lib/tracking';
 import type { Offer } from '@/content/types';
-import { Reveal, SecHead, EmLast } from '@/components/shared';
+import { Reveal, SecHead, EmLast, Collapse } from '@/components/shared';
 
 const ArrowBtn = () => <span className="btn-arrow" aria-hidden="true"><ArrowRight size={18} strokeWidth={2.4} /></span>;
 const TONES = ['peach', 'mint', 'butter', 'sky', 'lilac'];
@@ -99,8 +98,7 @@ export function Events({ onOrder }: { onOrder: (eventName: string) => void }) {
 function OfferCard({ offer, onChoose }: { offer: Offer; onChoose: (o: Offer) => void }) {
   const [drawer, setDrawer] = useState<'none' | 'included' | 'good'>('none');
   return (
-    <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-      className={`offer ${offer.featured ? 'is-featured' : ''}`}>
+    <div className={`offer anim-rise ${offer.featured ? 'is-featured' : ''}`}>
       {offer.badge && <span className="offer-badge">{offer.badge}</span>}
       <h3>{offer.name}</h3>
       <p className="offer-desc">{offer.description}</p>
@@ -116,18 +114,14 @@ function OfferCard({ offer, onChoose }: { offer: Offer; onChoose: (o: Offer) => 
             {d === 'included' ? "What's included" : 'Good to know'}
             <ChevronDown size={18} style={{ transform: drawer === d ? 'rotate(180deg)' : 'none' }} />
           </button>
-          <AnimatePresence initial={false}>
-            {drawer === d && (
-              <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} style={{ overflow: 'hidden' }}>
-                {(d === 'included' ? offer.included : offer.goodToKnow).map((x) => <li key={x}>· {x}</li>)}
-              </motion.ul>
-            )}
-          </AnimatePresence>
+          <Collapse open={drawer === d}>
+            <ul>{(d === 'included' ? offer.included : offer.goodToKnow).map((x) => <li key={x}>· {x}</li>)}</ul>
+          </Collapse>
         </div>
       ))}
       <div className="offer-spacer" />
       <button onClick={() => onChoose(offer)} className="btn-studio"><span>{offer.cta}</span><ArrowBtn /></button>
-    </motion.div>
+    </div>
   );
 }
 
@@ -250,13 +244,7 @@ function FaqItem({ id, q, a, open, setOpen, note = false }: { id: string; q: str
         <span>{q}</span>
         <span className="faq-icon"><Plus size={18} /></span>
       </button>
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }} style={{ overflow: 'hidden' }}>
-            <p className="faq-a">{a}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Collapse open={isOpen}><p className="faq-a">{a}</p></Collapse>
     </div>
   );
 }
