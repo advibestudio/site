@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, ChevronDown, MessageCircle, Check, CalendarDays, Plus, Package, Briefcase, Sparkles, Clapperboard, PartyPopper, Tv } from 'lucide-react';
-import { useStore, fmtNaira, waLink } from '@/lib/store';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, ChevronDown, MessageCircle, Check, CalendarDays, Plus, Star, Package, Briefcase, Sparkles, Clapperboard, PartyPopper, Tv } from 'lucide-react';
+import { useStore, waLink } from '@/lib/store';
+import { assetUrl, fmtMoney, priceFor, unitNote, waNumberFor } from '@/lib/money';
+import { useCountry } from '@/lib/country';
+import { useEvents } from '@/lib/useEvents';
+import { fmtEventDate } from '@/lib/events';
 import { track } from '@/lib/tracking';
-import type { Offer } from '@/content/types';
-import { Reveal, SecHead, EmLast, Collapse } from '@/components/shared';
+import type { Offer, PortfolioItem } from '@/content/types';
+import { Reveal, SecHead, EmLast, Collapse, VideoCard } from '@/components/shared';
 
 const ArrowBtn = () => <span className="btn-arrow" aria-hidden="true"><ArrowRight size={18} strokeWidth={2.4} /></span>;
 const TONES = ['peach', 'mint', 'butter', 'sky', 'lilac'];
@@ -55,12 +59,57 @@ export function Services() {
   );
 }
 
-/* ---------- EVENTS / SEASONAL ---------- */
+/* ---------- CLIENT SPOTLIGHT (trust) ---------- */
+export function ClientSpotlight({ onPlay }: { onPlay: (i: PortfolioItem) => void }) {
+  const { content } = useStore();
+  const k = content.client;
+  const needle = k.matchName.trim().toLowerCase();
+  const vids = needle
+    ? content.portfolio.filter((p) => p.visible && p.client.toLowerCase().includes(needle)).sort((x, y) => x.order - y.order).slice(0, 3)
+    : [];
+  if (!k.name) return null;
+  return (
+    <section id="clients" className="sec" style={{ paddingTop: 0 }} aria-label={`Client spotlight: ${k.name}`}>
+      <div className="wrap">
+        <div className="spotlight">
+          <Reveal className="spot-logo-wrap">
+            <div className="spot-logo">
+              <img src={assetUrl(k.logo)} alt={`${k.name} logo`} width={360} height={360} loading="lazy" decoding="async" />
+            </div>
+          </Reveal>
+          <Reveal delay={0.08} className="spot-copy">
+            <div className="spot-tags">
+              {k.sector && <span className="pill-label" style={{ marginBottom: 0 }}>{k.sector}</span>}
+              {k.badge && <span className="spot-badge"><Star size={13} fill="currentColor" aria-hidden="true" /> {k.badge}</span>}
+            </div>
+            <h2 className="h-section" style={{ maxWidth: '16ch' }}><EmLast text={k.heading} /></h2>
+            <p className="lead">{k.body}</p>
+            {k.points.length > 0 && (
+              <ul className="spot-points">
+                {k.points.map((p) => <li key={p}><Check size={18} strokeWidth={2.6} aria-hidden="true" />{p}</li>)}
+              </ul>
+            )}
+          </Reveal>
+          {vids.length > 0 && (
+            <div className="spot-videos">
+              {vids.map((v) => (
+                <div key={v.id} style={{ width: v.orientation === 'vertical' ? 'min(200px, 44vw)' : 'min(340px, 80vw)' }}>
+                  <VideoCard item={v} onPlay={onPlay} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- EVENTS / SEASONAL (driven by the calendar) ---------- */
 export function Events({ onOrder }: { onOrder: (eventName: string) => void }) {
   const { content } = useStore();
-  const upcoming = content.campaigns
-    .filter((c) => c.active && new Date(c.eventDate) >= new Date())
-    .sort((a, b) => +new Date(a.eventDate) - +new Date(b.eventDate));
+  const { country } = useCountry();
+  const events = useEvents();
   return (
     <section className="sec" style={{ paddingTop: 0 }}>
       <div className="wrap">
@@ -71,20 +120,25 @@ export function Events({ onOrder }: { onOrder: (eventName: string) => void }) {
             <p className="season-sub">{content.events.subheading}</p>
             <p className="season-body">{content.events.body}</p>
           </Reveal>
-          <div className="season-grid">
-            {upcoming.map((c, i) => (
-              <Reveal key={c.id} delay={i * 0.05}>
-                <button onClick={() => onOrder(c.name)} className="season" style={{ width: '100%' }}>
-                  <span>
-                    <small><CalendarDays size={13} style={{ display: 'inline', marginRight: 6, verticalAlign: -1 }} />
-                      {new Date(c.eventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</small>
-                    <strong>{c.name}</strong>
-                  </span>
-                  <ArrowRight size={20} />
-                </button>
-              </Reveal>
-            ))}
-          </div>
+          {events.length > 0 && (
+            <>
+              <p className="season-caption"><span aria-hidden="true">{country.flag}</span> Coming up in {country.name}</p>
+              <div className="season-grid">
+                {events.map((e, i) => (
+                  <Reveal key={e.id} delay={i * 0.05}>
+                    <button onClick={() => onOrder(e.name)} className="season" style={{ width: '100%' }}>
+                      <span>
+                        <small><CalendarDays size={13} style={{ display: 'inline', marginRight: 6, verticalAlign: -1 }} aria-hidden="true" />{fmtEventDate(e.date, true)}</small>
+                        <strong>{e.name}</strong>
+                        <small className="season-order">Order by {fmtEventDate(e.orderBy)}</small>
+                      </span>
+                      <ArrowRight size={20} aria-hidden="true" />
+                    </button>
+                  </Reveal>
+                ))}
+              </div>
+            </>
+          )}
           <Reveal delay={0.1}>
             <button onClick={() => onOrder('')} className="btn-studio" style={{ marginTop: 34 }}><span>{content.events.cta}</span><ArrowBtn /></button>
           </Reveal>
@@ -94,16 +148,18 @@ export function Events({ onOrder }: { onOrder: (eventName: string) => void }) {
   );
 }
 
-/* ---------- PRICING ---------- */
+/* ---------- PRICING (prices follow the visitor's country) ---------- */
 function OfferCard({ offer, onChoose }: { offer: Offer; onChoose: (o: Offer) => void }) {
+  const { country } = useCountry();
   const [drawer, setDrawer] = useState<'none' | 'included' | 'good'>('none');
+  const price = priceFor(offer, country) ?? 0;
   return (
     <div className={`offer anim-rise ${offer.featured ? 'is-featured' : ''}`}>
       {offer.badge && <span className="offer-badge">{offer.badge}</span>}
       <h3>{offer.name}</h3>
       <p className="offer-desc">{offer.description}</p>
-      <p className="offer-price">{fmtNaira(offer.price)}{offer.goal === 'monthly' && <small> /mo</small>}</p>
-      <p className="offer-note">{offer.unitNote}</p>
+      <p className="offer-price">{fmtMoney(price, country)}{offer.goal === 'monthly' && <small> /mo</small>}</p>
+      <p className="offer-note">{unitNote(offer, country)}</p>
       <p className="offer-who">{offer.whoFor}</p>
       <ul className="offer-list">
         {offer.features.map((f) => <li key={f}><Check size={18} strokeWidth={2.6} />{f}</li>)}
@@ -127,29 +183,60 @@ function OfferCard({ offer, onChoose }: { offer: Offer; onChoose: (o: Offer) => 
 
 export function Pricing({ onChoose }: { onChoose: (o: Offer) => void }) {
   const { content } = useStore();
+  const { country } = useCountry();
   const [goal, setGoal] = useState<'one' | 'test' | 'monthly'>('one');
-  const offers = useMemo(
-    () => content.offers.filter((o) => o.active && o.goal === goal).sort((a, b) => a.order - b.order),
-    [content.offers, goal],
+  const secRef = useRef<HTMLElement>(null);
+
+  // Only packages that have a price in this country are shown.
+  const available = useMemo(
+    () => content.offers.filter((o) => o.active && priceFor(o, country) !== undefined).sort((a, b) => a.order - b.order),
+    [content.offers, country],
   );
-  const activeGoal = content.pricing.goals.find((g) => g.id === goal);
+  const goals = content.pricing.goals.filter((g) => available.some((o) => o.goal === g.id));
+  const activeGoal = goals.find((g) => g.id === goal) ?? goals[0];
+  const offers = available.filter((o) => o.goal === activeGoal?.id);
+
+  // Tell Meta the visitor looked at the packages (once per country per visit).
+  useEffect(() => {
+    const el = secRef.current;
+    if (!el || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { track('ViewContent', { content_name: 'Packages', currency: country.currency }); io.disconnect(); }
+    }, { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [country.code, country.currency]);
+
   return (
-    <section id="pricing" className="sec">
+    <section id="pricing" className="sec" ref={secRef}>
       <div className="wrap">
         <SecHead label="Packages" lead={content.pricing.subheading}><EmLast text={content.pricing.heading} /></SecHead>
-        <Reveal delay={0.05}>
-          <div className="goal-tabs" role="tablist" aria-label="Choose your goal">
-            {content.pricing.goals.map((g) => (
-              <button key={g.id} role="tab" aria-selected={goal === g.id} onClick={() => setGoal(g.id)} className="goal">
-                <strong>{g.label}</strong><span>{g.blurb}</span>
-              </button>
-            ))}
+        {available.length === 0 ? (
+          <div className="card-soft" style={{ maxWidth: 560 }}>
+            <p style={{ fontWeight: 700 }}>Packages for {country.name} are coming soon.</p>
+            <p style={{ marginTop: 6, color: 'rgb(var(--ink-2))' }}>Message us on WhatsApp and we will send you a quote.</p>
+            <a className="btn-studio" style={{ marginTop: 14 }} href={waLink(waNumberFor(content.settings.whatsappNumber, country), `Hi ${content.settings.whatsappDisplay}, I'm in ${country.name} and want a video ad.`)} target="_blank" rel="noreferrer" onClick={() => track('Contact')}>
+              <span>WhatsApp us</span><ArrowBtn />
+            </a>
           </div>
-        </Reveal>
-        <div className={`offers ${offers.length > 1 ? '' : 'single'}`}>
-          {offers.map((o) => <OfferCard key={o.id} offer={o} onChoose={onChoose} />)}
-        </div>
-        {goal === 'test' && <p className="pricing-foot">One ad gives you one chance. Multiple ads give you data. {activeGoal?.blurb}</p>}
+        ) : (
+          <>
+            <Reveal delay={0.05}>
+              <div className="goal-tabs" role="tablist" aria-label="Choose your goal" style={{ gridTemplateColumns: `repeat(${Math.max(1, goals.length)}, minmax(0, 1fr))` }}>
+                {goals.map((g) => (
+                  <button key={g.id} role="tab" aria-selected={activeGoal?.id === g.id} onClick={() => setGoal(g.id)} className="goal">
+                    <strong>{g.label}</strong><span>{g.blurb}</span>
+                  </button>
+                ))}
+              </div>
+            </Reveal>
+            <div className={`offers ${offers.length > 1 ? '' : 'single'}`}>
+              {offers.map((o) => <OfferCard key={`${country.code}-${o.id}`} offer={o} onChoose={onChoose} />)}
+            </div>
+            {activeGoal?.id === 'test' && <p className="pricing-foot">One ad gives you one chance. Multiple ads give you data. {activeGoal.blurb}</p>}
+            <p className="pricing-foot">Prices shown in {country.name} ({country.currency}).</p>
+          </>
+        )}
       </div>
     </section>
   );
@@ -269,6 +356,7 @@ export function Faq() {
 /* ---------- FINAL CTA ---------- */
 export function FinalCta({ onOrder }: { onOrder: () => void }) {
   const { content } = useStore();
+  const { country } = useCountry();
   return (
     <section className="sec" style={{ paddingTop: 0 }}>
       <div className="wrap">
@@ -280,7 +368,7 @@ export function FinalCta({ onOrder }: { onOrder: () => void }) {
           <Reveal delay={0.1}>
             <div className="final-cta">
               <button onClick={onOrder} className="btn-studio"><span>{content.finalCta.primaryCta}</span><ArrowBtn /></button>
-              <a className="btn-ghost" href={waLink(content.settings.whatsappNumber, `Hi ${content.settings.whatsappDisplay}, I want a video ad for my business.`)}
+              <a className="btn-ghost" href={waLink(waNumberFor(content.settings.whatsappNumber, country), `Hi ${content.settings.whatsappDisplay}, I want a video ad for my business.`)}
                 target="_blank" rel="noreferrer" onClick={() => track('Contact')}>
                 <MessageCircle size={18} /> WhatsApp us
               </a>
@@ -295,6 +383,7 @@ export function FinalCta({ onOrder }: { onOrder: () => void }) {
 /* ---------- FOOTER ---------- */
 export function Footer() {
   const { content } = useStore();
+  const { country } = useCountry();
   return (
     <footer className="site-foot">
       <div className="wrap">
@@ -306,7 +395,7 @@ export function Footer() {
           <div className="foot-col">
             <h4>Contact</h4>
             <a href={`mailto:${content.settings.email}`}>{content.settings.email}</a>
-            <a href={waLink(content.settings.whatsappNumber, 'Hi!')} target="_blank" rel="noreferrer" onClick={() => track('Contact')}>WhatsApp</a>
+            <a href={waLink(waNumberFor(content.settings.whatsappNumber, country), 'Hi!')} target="_blank" rel="noreferrer" onClick={() => track('Contact')}>WhatsApp</a>
           </div>
           <div className="foot-col">
             <h4>Explore</h4>

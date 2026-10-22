@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ArrowDown, ChevronLeft, ChevronRight, MessageCircle, Menu, X, Play } from 'lucide-react';
-import { useStore, waLink, fmtNaira } from '@/lib/store';
+import { ArrowRight, ArrowDown, ChevronDown, ChevronLeft, ChevronRight, MessageCircle, Menu, X, Play } from 'lucide-react';
+import { useStore, waLink } from '@/lib/store';
+import { assetUrl, fmtMoney, priceFor, waNumberFor } from '@/lib/money';
+import { useCountry } from '@/lib/country';
+import { useEvents } from '@/lib/useEvents';
+import { fmtEventDate, todayYmd } from '@/lib/events';
 import { track } from '@/lib/tracking';
 import type { PortfolioItem } from '@/content/types';
 import { Reveal, VideoCard, SecHead, EmLast } from '@/components/shared';
@@ -8,6 +12,40 @@ import { Wall } from '@/components/Wall';
 
 function ArrowBtn() {
   return <span className="btn-arrow" aria-hidden="true"><ArrowRight size={18} strokeWidth={2.4} /></span>;
+}
+
+/* ---------- COUNTRY SWITCHER (small dropdown in the nav) ---------- */
+function CountrySwitch() {
+  const { country, countries, setCountry } = useCountry();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  if (countries.length < 2) return null;
+  return (
+    <div className="country" ref={ref}>
+      <button className="country-btn" aria-haspopup="listbox" aria-expanded={open} aria-label={`Country: ${country.name}. Change country`} onClick={() => setOpen(!open)}>
+        <span aria-hidden="true">{country.flag}</span><span>{country.code}</span><ChevronDown size={14} aria-hidden="true" />
+      </button>
+      {open && (
+        <ul className="country-menu" role="listbox" aria-label="Choose your country">
+          {countries.map((c) => (
+            <li key={c.code}>
+              <button role="option" aria-selected={c.code === country.code} onClick={() => { setCountry(c.code); setOpen(false); }}>
+                <span aria-hidden="true">{c.flag}</span><span>{c.name}</span><small>{c.currency}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /* ---------- NAV ---------- */
@@ -21,13 +59,15 @@ export function Nav({ onOrder }: { onOrder: () => void }) {
     window.addEventListener('scroll', on, { passive: true });
     return () => window.removeEventListener('scroll', on);
   }, []);
+  const sec = content.sections;
+  // A link only appears if its section is switched on.
   const links = [
-    { label: 'Work', href: '#work' },
-    { label: 'Services', href: '#services' },
-    { label: 'Packages', href: '#pricing' },
-    { label: 'How it works', href: '#process' },
-    { label: 'FAQs', href: '#faq' },
-  ];
+    { label: 'Work', href: '#work', on: sec.showcase },
+    { label: 'Services', href: '#services', on: sec.services },
+    { label: 'Packages', href: '#pricing', on: true },
+    { label: 'How it works', href: '#process', on: sec.process },
+    { label: 'FAQs', href: '#faq', on: sec.faq },
+  ].filter((l) => l.on);
   return (
     <header className={`site-nav ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="site-nav-bar">
@@ -39,6 +79,7 @@ export function Nav({ onOrder }: { onOrder: () => void }) {
           {links.map((l) => <a key={l.href} href={l.href}>{l.label}</a>)}
         </nav>
         <div className="site-actions">
+          <CountrySwitch />
           <button onClick={onOrder} className="btn-studio is-sm">
             <span>Get your video</span><span className="btn-arrow" aria-hidden="true"><ArrowRight size={16} strokeWidth={2.4} /></span>
           </button>
@@ -74,14 +115,21 @@ function useCountdown(target: string) {
 
 function EventPill({ onOrder }: { onOrder: () => void }) {
   const { content } = useStore();
-  const campaign = content.campaigns.find((c) => c.id === content.banner.campaignId && c.active);
-  const cd = useCountdown(campaign?.orderBy ?? '2026-12-31');
-  if (!content.banner.enabled || !campaign) return null;
+  const { country } = useCountry();
+  const events = useEvents();
+  // The campaign you chose for the banner — if it applies to this country...
+  const campaign = content.campaigns.find((c) => c.id === content.banner.campaignId && c.active && (!c.countries?.length || c.countries.includes(country.code)));
+  // ...otherwise the next event from the calendar whose "order by" date hasn't passed.
+  const next = !campaign ? events.find((e) => e.orderBy >= todayYmd()) : undefined;
+  const target = campaign?.orderBy ?? next?.orderBy ?? '2026-12-31';
+  const text = campaign?.bannerText ?? (next ? `${next.name} is coming. Order by ${fmtEventDate(next.orderBy)} to launch on time.` : '');
+  const cd = useCountdown(target);
+  if (!content.banner.enabled || !text) return null;
   const p = (v: number) => String(v).padStart(2, '0');
   return (
     <button onClick={onOrder} className="event-pill">
       <span className="event-dot" aria-hidden="true" />
-      <span>{campaign.bannerText}</span>
+      <span>{text}</span>
       <span className="event-clock" aria-label="Time left to order">{cd.d}d {p(cd.h)}:{p(cd.m)}:{p(cd.s)}</span>
     </button>
   );
@@ -92,14 +140,30 @@ const Scribble = ({ d, len, w, h }: { d: string; len: number; w: number; h: numb
   <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true"><path d={d} style={{ ['--len' as string]: len }} /></svg>
 );
 
+/** Small "Trusted by …" badge under the hero buttons. Links down to the full client section. */
+function ClientBadge() {
+  const { content } = useStore();
+  const k = content.client;
+  if (!content.sections.clients || !k.name) return null;
+  return (
+    <a href="#clients" className="client-badge">
+      {k.mark && <img src={assetUrl(k.mark)} alt="" width={30} height={30} />}
+      <span>Trusted by <strong>{k.name}</strong>{k.sector ? ` · ${k.sector}` : ''}{k.badge ? ` · ${k.badge}` : ''}</span>
+    </a>
+  );
+}
+
 export function Hero({ onOrder, onPlay }: { onOrder: () => void; onPlay: (i: PortfolioItem) => void }) {
   const { content } = useStore();
+  const { country } = useCountry();
   const items = useMemo(
     () => content.portfolio.filter((p) => p.visible).sort((a, b) => a.order - b.order),
     [content.portfolio],
   );
-  const from = Math.min(...content.offers.filter((o) => o.active).map((o) => o.price));
-  const micro = [`Delivered in ${content.settings.deliveryDays} days`, Number.isFinite(from) ? `Packages from ${fmtNaira(from)}` : ''].filter(Boolean).join(' · ');
+  const prices = content.offers.filter((o) => o.active).map((o) => priceFor(o, country)).filter((p): p is number => typeof p === 'number');
+  const from = prices.length ? Math.min(...prices) : NaN;
+  const micro = [`Delivered in ${content.settings.deliveryDays} days`, Number.isFinite(from) ? `Packages from ${fmtMoney(from, country)}` : ''].filter(Boolean).join(' · ');
+  const showWall = content.sections.wall && items.length > 0;
   return (
     <section id="top" className="hero" aria-labelledby="hero-title">
       <div className="hero-bg" aria-hidden="true" />
@@ -110,24 +174,27 @@ export function Hero({ onOrder, onPlay }: { onOrder: () => void; onPlay: (i: Por
         <p className="hero-sub">{content.hero.subheadline}</p>
         <div className="hero-cta">
           <button onClick={onOrder} className="btn-studio"><span>{content.hero.primaryCta}</span><ArrowBtn /></button>
-          <a className="btn-ghost" href="#work">{content.hero.secondaryCta} <ArrowDown size={18} /></a>
+          {content.sections.showcase && <a className="btn-ghost" href="#work">{content.hero.secondaryCta} <ArrowDown size={18} /></a>}
         </div>
         {micro && <p className="hero-micro">{micro}</p>}
+        <ClientBadge />
       </div>
 
-      <div className="wall-zone">
-        <div className="note note-a" aria-hidden="true">
-          <span>ads we've made</span>
-          <Scribble w={90} h={50} len={140} d="M6 6 C 8 34, 38 44, 80 38 M80 38 L66 28 M80 38 L68 50" />
+      {showWall && (
+        <div className="wall-zone">
+          <div className="note note-a" aria-hidden="true">
+            <span>ads we've made</span>
+            <Scribble w={90} h={50} len={140} d="M6 6 C 8 34, 38 44, 80 38 M80 38 L66 28 M80 38 L68 50" />
+          </div>
+          <div className="note note-b" aria-hidden="true">
+            <span>no camera crew</span>
+            <Scribble w={90} h={50} len={140} d="M84 6 C 82 34, 52 44, 10 38 M10 38 L24 28 M10 38 L22 50" />
+          </div>
+          <Wall items={items} onPlay={onPlay} />
+          <div className="wall-floor" aria-hidden="true" />
+          <p className="wall-hint">Drag to spin · Tap a video to watch</p>
         </div>
-        <div className="note note-b" aria-hidden="true">
-          <span>no camera crew</span>
-          <Scribble w={90} h={50} len={140} d="M84 6 C 82 34, 52 44, 10 38 M10 38 L24 28 M10 38 L22 50" />
-        </div>
-        <Wall items={items} onPlay={onPlay} />
-        <div className="wall-floor" aria-hidden="true" />
-        <p className="wall-hint">Drag to spin · Tap a video to watch</p>
-      </div>
+      )}
     </section>
   );
 }
@@ -219,10 +286,11 @@ export function Showcase({ onPlay }: { onPlay: (i: PortfolioItem) => void }) {
 /* ---------- STICKY MOBILE CTA ---------- */
 export function StickyBar({ onOrder }: { onOrder: () => void }) {
   const { content } = useStore();
+  const { country } = useCountry();
   return (
     <div className="sticky-bar">
       <button onClick={onOrder} className="btn-studio"><span>Get your video</span><ArrowBtn /></button>
-      <a className="sticky-wa" href={waLink(content.settings.whatsappNumber, `Hi ${content.settings.whatsappDisplay}, I want to ask about a video ad.`)}
+      <a className="sticky-wa" href={waLink(waNumberFor(content.settings.whatsappNumber, country), `Hi ${content.settings.whatsappDisplay}, I want to ask about a video ad.`)}
         target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp" onClick={() => track('Contact')}>
         <MessageCircle size={22} />
       </a>
