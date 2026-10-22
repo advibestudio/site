@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, ArrowRight, ArrowLeft, CheckCircle2, MessageCircle, Copy, Check, Loader2 } from 'lucide-react';
-import { useStore, fmtNaira, waLink } from '@/lib/store';
+import { useStore, waLink } from '@/lib/store';
+import { fmtMoney, getParam, payTextFor, priceFor, unitNote, waNumberFor } from '@/lib/money';
+import { useCountry } from '@/lib/country';
 import { track } from '@/lib/tracking';
 import type { Offer, Lead } from '@/content/types';
 
@@ -17,6 +19,9 @@ const Arrow = () => <span className="btn-arrow" aria-hidden="true"><ArrowRight s
 
 export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
   const { content, addLead } = useStore();
+  const { country, countries, setCountry } = useCountry();
+  const price = offer ? priceFor(offer, country) : undefined;
+  const unavailable = Boolean(offer) && price === undefined; // chosen country doesn't sell this package
   const [step, setStep] = useState(0);
   const [done, setDone] = useState<Lead | null>(null);
   const [sending, setSending] = useState(false);
@@ -26,8 +31,15 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
     name: '', whatsapp: '', email: '', business: '', industry: INDUSTRIES[0], product: '',
     event: eventName ?? '', notes: '', honey: '',
   });
+  const [showPublic, setShowPublic] = useState(true);
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const steps = ['Contact', 'Business', 'Your need', 'Review'];
+
+  // Tell Meta the visitor started checkout (once, when the form opens with a package).
+  useEffect(() => {
+    if (offer && price !== undefined) track('InitiateCheckout', { value: price, currency: country.currency, content_name: offer.name });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -40,6 +52,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
   const validate = (): boolean => {
     const e: string[] = [];
     if (step === 0) {
+      if (unavailable) e.push(`That package isn't available in ${country.name}. Close this window and choose another package.`);
       if (form.name.trim().length < 2) e.push('Please enter your name.');
       if (form.whatsapp.replace(/[^\d]/g, '').length < 7) e.push('Please enter a valid WhatsApp number with country code.');
       if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) e.push('That email address looks incomplete.');
@@ -55,16 +68,17 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
   const submit = async () => {
     if (sending) return;
     if (form.honey) { onClose(); return; } // spam-bot trap: real people never see this field
-    if (!offer) return;
+    if (!offer || price === undefined) return;
     setSending(true);
     try {
-      const utm = new URLSearchParams(window.location.search).get('utm_source') ?? undefined;
+      const utm = getParam('utm_source');
       const lead = await addLead({
         name: form.name.trim(), business: form.business.trim(), whatsapp: form.whatsapp.trim(),
-        email: form.email.trim(), offerId: offer.id, offerName: offer.name, price: offer.price,
+        email: form.email.trim(), offerId: offer.id, offerName: offer.name, price,
         industry: form.industry, product: form.product.trim(), event: form.event || 'None',
         notes: form.notes.trim(), utmSource: utm,
-      });
+        country: country.code, currency: country.currency, source: 'website', showPublic,
+      }, country.name);
       setDone(lead);
     } finally {
       setSending(false);
@@ -84,7 +98,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
         <div className="modal-top">
           <div>
             <p className="modal-kicker">{done ? 'Order received' : offer ? 'Your package' : 'Start your order'}</p>
-            {!done && offer && <p className="modal-title">{offer.name} <small>· {fmtNaira(offer.price)} · {offer.unitNote}</small></p>}
+            {!done && offer && <p className="modal-title">{offer.name} <small>· {price !== undefined ? fmtMoney(price, country) : 'not sold here'} · {unitNote(offer, country)}</small></p>}
           </div>
           <button onClick={onClose} className="close-btn" aria-label="Close"><X size={20} /></button>
         </div>
@@ -100,7 +114,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
             </div>
             <div className="card-soft">
               <p style={{ fontWeight: 700, marginBottom: 4 }}>Pay now</p>
-              <p style={{ color: 'rgb(var(--ink-2))' }}>{content.settings.paymentInstructions}</p>
+              <p style={{ color: 'rgb(var(--ink-2))' }}>{payTextFor(content.settings.paymentInstructions, country)}</p>
               <button
                 onClick={() => { navigator.clipboard?.writeText(done.ref); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
                 className="btn-back" style={{ minHeight: 44, marginTop: 14, fontSize: 14 }}
@@ -109,7 +123,7 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
               </button>
             </div>
             <a className="btn-studio is-brand" style={{ justifyContent: 'center', padding: '0 26px' }}
-              href={waLink(content.settings.whatsappNumber, waMsg)} target="_blank" rel="noreferrer" onClick={() => track('Contact')}>
+              href={waLink(waNumberFor(content.settings.whatsappNumber, country), waMsg)} target="_blank" rel="noreferrer" onClick={() => track('Contact')}>
               <MessageCircle size={20} /> <span>Continue on WhatsApp</span>
             </a>
             <p style={{ textAlign: 'center', fontSize: 13.5, color: 'rgb(var(--muted))' }}>Your order details are pre-filled in the message.</p>
@@ -130,9 +144,18 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
             <div key={step} className="form-stack anim-step">
                 {step === 0 && (
                   <>
+                    <label className="field-label" htmlFor="f-country">Country</label>
+                    <select id="f-country" className="field" value={country.code} onChange={(e) => setCountry(e.target.value)}>
+                      {countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.currency})</option>)}
+                    </select>
+                    {unavailable && <div className="err-box" style={{ marginTop: 0 }}>This package isn't sold in {country.name}. Close this window and pick another package, or choose a different country.</div>}
                     <input className="field" placeholder="Full name *" value={form.name} onChange={(e) => set('name', e.target.value)} autoComplete="name" />
                     <input className="field" placeholder="WhatsApp number (with country code) *" value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} inputMode="tel" autoComplete="tel" />
                     <input className="field" placeholder="Email (optional — for updates & offers)" value={form.email} onChange={(e) => set('email', e.target.value)} inputMode="email" autoComplete="email" />
+                    <label className="check-row">
+                      <input type="checkbox" checked={showPublic} onChange={(e) => setShowPublic(e.target.checked)} />
+                      <span>Show my first name and country in the “just started” notice on this site <small>(optional — tick off to stay private)</small></span>
+                    </label>
                     <input style={{ position: 'absolute', left: '-9999px' }} tabIndex={-1} autoComplete="off" value={form.honey} onChange={(e) => set('honey', e.target.value)} aria-hidden="true" name="website" />
                   </>
                 )}
@@ -160,7 +183,8 @@ export function OrderModal({ offer, eventName, onClose, onPickOffer }: Props) {
                 {step === 3 && (
                   <div className="card-soft">
                     {[
-                      ['Package', `${offer.name} — ${fmtNaira(offer.price)}`],
+                      ['Package', `${offer.name} — ${price !== undefined ? fmtMoney(price, country) : '—'}`],
+                      ['Country', `${country.flag} ${country.name}`],
                       ['Name', form.name], ['WhatsApp', form.whatsapp],
                       ...(form.email ? [['Email', form.email]] : []),
                       ['Business', `${form.business} (${form.industry})`],
