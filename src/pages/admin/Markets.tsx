@@ -147,13 +147,21 @@ export function CountriesTab({ draft, set }: { draft: SiteContent; set: SetFn })
           <Field label="How this country pays (shown right after they order)" hint="Empty = use the main payment text in Settings.">
             <textarea className={`${inputCls} min-h-[80px] resize-none`} value={c.paymentInstructions} placeholder="Same as main" onChange={(e) => set((d) => { d.countries[i].paymentInstructions = e.target.value; })} />
           </Field>
+          <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <p className={labelCls}>Typical cost of ONE traditionally-made video ad in {c.name} <span className="normal-case tracking-normal text-white/30">({c.currency})</span></p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="From"><input type="number" min={0} className={inputCls} value={c.tradLow || ''} placeholder="0" onChange={(e) => set((d) => { d.countries[i].tradLow = Math.max(0, Number(e.target.value) || 0); })} /></Field>
+              <Field label="To"><input type="number" min={0} className={inputCls} value={c.tradHigh || ''} placeholder="0" onChange={(e) => set((d) => { d.countries[i].tradHigh = Math.max(0, Number(e.target.value) || 0); })} /></Field>
+            </div>
+            <p className="mt-2 text-xs text-white/40">Used by the cost-comparison card and the “AI video ads” page. <strong className="text-amber-300/90">The starter numbers are rough estimates I filled in — replace them with figures you can stand behind.</strong> Leave 0 to hide the comparison in this country.</p>
+          </div>
           <p className="text-xs text-white/40">Preview: Single 30s Video would show as <strong className="text-white/70">{c.prices['single-30'] ? fmtMoney(c.prices['single-30'], c) : 'hidden'}</strong></p>
         </div>
       ))}
 
       <button type="button" onClick={() => set((d) => {
         const n = d.countries.length + 1;
-        d.countries.push({ code: `C${n}`, slug: `c${n}`, name: 'New country', flag: '🏳️', currency: 'USD', symbol: '$', active: false, prices: {}, whatsappNumber: '', paymentInstructions: '', pixelId: '' });
+        d.countries.push({ code: `C${n}`, slug: `c${n}`, name: 'New country', flag: '🏳️', currency: 'USD', symbol: '$', active: false, prices: {}, whatsappNumber: '', paymentInstructions: '', pixelId: '', tradLow: 0, tradHigh: 0 });
       })} className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 text-sm font-semibold text-white/60 transition hover:border-[#f5a524] hover:text-[#f5a524]">
         <Plus className="h-4 w-4" /> Add another country
       </button>
@@ -172,6 +180,7 @@ const SECTION_INFO: { key: SectionKey; title: string; desc: string }[] = [
   { key: 'clients', title: 'Client spotlight', desc: 'The "trusted by" badge under the hero buttons and the featured-client section.' },
   { key: 'problem', title: 'The problem section', desc: '"People don\'t read everything. They scroll."' },
   { key: 'services', title: 'Services', desc: 'The coloured tiles listing every kind of ad.' },
+  { key: 'aiCompare', title: 'Cost-comparison card + page link', desc: 'The "What AI replaces · typical costs" card under the packages and its link to the full "AI video ads" page.' },
   { key: 'events', title: 'Upcoming events / sales seasons', desc: 'The calendar-powered "Got something coming up?" block.' },
   { key: 'whyUs', title: 'Why businesses choose us', desc: 'The "no camera crew" statement and chips.' },
   { key: 'process', title: 'How it works', desc: 'The step-by-step process. (Also hides its menu link.)' },
@@ -336,6 +345,37 @@ export function EventsTab({ draft, set }: { draft: SiteContent; set: SetFn }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/* COST CARD                                                               */
+/* ====================================================================== */
+export function CostCardTab({ draft, set }: { draft: SiteContent; set: SetFn }) {
+  const k = draft.aiCompare;
+  const base = window.location.href.split('#')[0].split('?')[0];
+  return (
+    <div className="space-y-6">
+      <div className={box}>
+        <div>
+          <p className="font-display text-lg uppercase text-white">Cost-comparison card</p>
+          <p className="mt-1 text-sm text-white/50">The small “What AI replaces · typical costs” card under your packages. It compares the <strong className="text-white/70">typical cost of one traditional video ad</strong> (set per country in <strong className="text-white/70">Countries &amp; Prices</strong>) with <strong className="text-white/70">your real prices</strong> for that country, and links to the full breakdown page.
+            Switch it off under <strong className="text-white/70">Sections</strong>.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Card title"><input className={inputCls} value={k.title} onChange={(e) => set((d) => { d.aiCompare.title = e.target.value; })} /></Field>
+          <Field label="Traditional row label"><input className={inputCls} value={k.tradLabel} onChange={(e) => set((d) => { d.aiCompare.tradLabel = e.target.value; })} /></Field>
+          <Field label="Your row label"><input className={inputCls} value={k.aiLabel} onChange={(e) => set((d) => { d.aiCompare.aiLabel = e.target.value; })} /></Field>
+        </div>
+        <Field label="Paragraph under the bars"><textarea className={`${inputCls} min-h-[80px] resize-none`} value={k.body} onChange={(e) => set((d) => { d.aiCompare.body = e.target.value; })} /></Field>
+        <Field label="Link wording"><input className={inputCls} value={k.linkText} onChange={(e) => set((d) => { d.aiCompare.linkText = e.target.value; })} /></Field>
+      </div>
+      <div className={box}>
+        <p className="font-display text-lg uppercase text-white">The full page</p>
+        <p className="text-sm text-white/50">The link opens a full page at <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-[#f5a524]">{base}#/ai-video</code>. It re-uses your services, process steps, packages, headline numbers and client from the other tabs. Its remaining wording is in the file <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">src/content/aiPage.ts</code> (see README, Part 14). You can also use that link directly in ads or messages.</p>
+        <a href={`${base}#/ai-video`} target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-white/15 px-4 text-sm font-semibold text-white/80 hover:bg-white/10"><ExternalLink className="h-4 w-4" /> Open the page</a>
       </div>
     </div>
   );

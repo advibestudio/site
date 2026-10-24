@@ -3,7 +3,7 @@ import { Check, ExternalLink, Eye, EyeOff, Plus, RotateCcw, Trash2 } from 'lucid
 import { useStore, extractYouTubeId, ytThumb } from '@/lib/store';
 import type { SiteContent, Offer, PortfolioItem } from '@/content/types';
 import { defaultContent } from '@/content/defaultContent';
-import { ClientTab, CountriesTab, CountryChips, EventsTab, SectionsTab } from './Markets';
+import { ClientTab, CostCardTab, CountriesTab, CountryChips, EventsTab, SectionsTab } from './Markets';
 
 const inputCls = 'w-full rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-[#f5a524] focus:outline-none';
 const labelCls = 'mb-1.5 block text-xs font-bold uppercase tracking-widest text-white/45';
@@ -12,7 +12,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block"><span className={labelCls}>{label}</span>{children}</label>;
 }
 
-const TABS = ['Hero', 'Portfolio', 'Pricing & Offers', 'Countries & Prices', 'Sections', 'Client', 'Events', 'Campaigns', 'Testimonials', 'FAQs', 'Settings'] as const;
+const TABS = ['Hero', 'Portfolio', 'Pricing & Offers', 'Countries & Prices', 'Sections', 'Client', 'Cost card', 'Events', 'Campaigns', 'Testimonials', 'FAQs', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export function ContentView({ role, actor }: { role: 'owner' | 'ops'; actor: string }) {
@@ -121,6 +121,7 @@ export function ContentView({ role, actor }: { role: 'owner' | 'ops'; actor: str
       {tab === 'Countries & Prices' && <CountriesTab draft={draft} set={set} />}
       {tab === 'Sections' && <SectionsTab draft={draft} set={set} />}
       {tab === 'Client' && <ClientTab draft={draft} set={set} />}
+      {tab === 'Cost card' && <CostCardTab draft={draft} set={set} />}
       {tab === 'Events' && <EventsTab draft={draft} set={set} />}
 
       {tab === 'Campaigns' && (

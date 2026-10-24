@@ -82,8 +82,8 @@ export function LeadsView() {
               <div>
                 <p className="font-display text-lg uppercase text-white">{l.business} <span className="font-mono text-xs normal-case text-white/35">{l.ref}</span></p>
                 <p className="text-sm text-white/55">{l.name} · {l.whatsapp}{l.email ? ` · ${l.email}` : ''}</p>
-                <p className="mt-1 text-sm text-white/70">{l.offerName} — <span className="font-semibold text-[#f5a524]">{money(l)}</span></p>
-                <p className="mt-1 text-xs text-white/40">{flagOf(l.country)} {l.country}{l.industry ? ` · ${l.industry}` : ''}{l.product ? ` · selling: ${l.product}` : ''} · event: {l.event} · {l.date}{l.utmSource ? ` · via ${l.utmSource}` : ''}{l.source !== 'website' ? ` · entered manually (${l.source})` : ''}</p>
+                <p className="mt-1 text-sm text-white/70">{l.offerName} — <span className="font-semibold text-[#f5a524]">{l.price > 0 ? money(l) : 'free session'}</span></p>
+                <p className="mt-1 text-xs text-white/40">{flagOf(l.country)} {l.country}{l.industry ? ` · ${l.industry}` : ''}{l.product ? ` · selling: ${l.product}` : ''} · event: {l.event} · {l.date}{l.utmSource ? ` · via ${l.utmSource}` : ''}{l.source === 'strategy' ? ' · strategy-session request' : l.source !== 'website' ? ` · entered manually (${l.source})` : ''}</p>
                 {l.notes && <p className="mt-2 rounded-lg bg-white/5 p-2.5 text-xs text-white/55">“{l.notes}”</p>}
               </div>
               <div className="flex flex-col items-end gap-2">
