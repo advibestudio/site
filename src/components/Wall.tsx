@@ -106,8 +106,9 @@ export function Wall({ items, onPlay }: { items: PortfolioItem[]; onPlay: (i: Po
           } else if (Math.abs(vel) > 1) {
             rot += vel * dt;
             vel *= Math.pow(0.04, dt); // friction
-          } else if (!reduce && !hovering && now - idleSince > 2500) {
-            rot += 2.2 * dt;           // slow drift
+          } else if (!reduce && now - idleSince > 2500) {
+            // keeps moving all the time; hovering only slows it down (it never stops)
+            rot += (hovering ? 0.6 : 2.2) * dt;
           }
         }
         render();
@@ -147,7 +148,7 @@ export function Wall({ items, onPlay }: { items: PortfolioItem[]; onPlay: (i: Po
       setTimeout(() => { delete wall.dataset.dragged; }, 80);
     };
     const enter = () => { hovering = true; };
-    const leave = () => { hovering = false; idleSince = performance.now(); };
+    const leave = () => { hovering = false; };
     const key = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
