@@ -222,7 +222,7 @@ export function Pricing({ onChoose }: { onChoose: (o: Offer) => void }) {
         ) : (
           <>
             <Reveal delay={0.05}>
-              <div className="goal-tabs" role="tablist" aria-label="Choose your goal" style={{ gridTemplateColumns: `repeat(${Math.max(1, goals.length)}, minmax(0, 1fr))` }}>
+              <div className="goal-tabs" role="tablist" aria-label="Choose your goal">
                 {goals.map((g) => (
                   <button key={g.id} role="tab" aria-selected={activeGoal?.id === g.id} onClick={() => setGoal(g.id)} className="goal">
                     <strong>{g.label}</strong><span>{g.blurb}</span>
@@ -354,7 +354,7 @@ export function Faq() {
 }
 
 /* ---------- FINAL CTA ---------- */
-export function FinalCta({ onOrder }: { onOrder: () => void }) {
+export function FinalCta({ onStrategy }: { onStrategy: () => void }) {
   const { content } = useStore();
   const { country } = useCountry();
   return (
@@ -367,10 +367,10 @@ export function FinalCta({ onOrder }: { onOrder: () => void }) {
           </Reveal>
           <Reveal delay={0.1}>
             <div className="final-cta">
-              <button onClick={onOrder} className="btn-studio"><span>{content.finalCta.primaryCta}</span><ArrowBtn /></button>
+              <button onClick={onStrategy} className="btn-studio is-wrap"><span>{content.finalCta.primaryCta}</span><ArrowBtn /></button>
               <a className="btn-ghost" href={waLink(waNumberFor(content.settings.whatsappNumber, country), `Hi ${content.settings.whatsappDisplay}, I want a video ad for my business.`)}
                 target="_blank" rel="noreferrer" onClick={() => track('Contact')}>
-                <MessageCircle size={18} /> WhatsApp us
+                <MessageCircle size={18} /> Just a quick question? WhatsApp us
               </a>
             </div>
           </Reveal>

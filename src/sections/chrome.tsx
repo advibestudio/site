@@ -153,7 +153,7 @@ function ClientBadge() {
   );
 }
 
-export function Hero({ onOrder, onPlay }: { onOrder: () => void; onPlay: (i: PortfolioItem) => void }) {
+export function Hero({ onOrder, onStrategy, onPlay }: { onOrder: () => void; onStrategy: () => void; onPlay: (i: PortfolioItem) => void }) {
   const { content } = useStore();
   const { country } = useCountry();
   const items = useMemo(
@@ -173,7 +173,7 @@ export function Hero({ onOrder, onPlay }: { onOrder: () => void; onPlay: (i: Por
         <h1 id="hero-title" className="h-hero"><span><EmLast text={content.hero.headline} /></span></h1>
         <p className="hero-sub">{content.hero.subheadline}</p>
         <div className="hero-cta">
-          <button onClick={onOrder} className="btn-studio"><span>{content.hero.primaryCta}</span><ArrowBtn /></button>
+          <button onClick={onStrategy} className="btn-studio is-wrap"><span>{content.hero.primaryCta}</span><ArrowBtn /></button>
           {content.sections.showcase && <a className="btn-ghost" href="#work">{content.hero.secondaryCta} <ArrowDown size={18} /></a>}
         </div>
         {micro && <p className="hero-micro">{micro}</p>}
@@ -284,12 +284,12 @@ export function Showcase({ onPlay }: { onPlay: (i: PortfolioItem) => void }) {
 }
 
 /* ---------- STICKY MOBILE CTA ---------- */
-export function StickyBar({ onOrder }: { onOrder: () => void }) {
+export function StickyBar({ onStrategy }: { onStrategy: () => void }) {
   const { content } = useStore();
   const { country } = useCountry();
   return (
     <div className="sticky-bar">
-      <button onClick={onOrder} className="btn-studio"><span>Get your video</span><ArrowBtn /></button>
+      <button onClick={onStrategy} className="btn-studio"><span>Free strategy session</span><ArrowBtn /></button>
       <a className="sticky-wa" href={waLink(waNumberFor(content.settings.whatsappNumber, country), `Hi ${content.settings.whatsappDisplay}, I want to ask about a video ad.`)}
         target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp" onClick={() => track('Contact')}>
         <MessageCircle size={22} />
