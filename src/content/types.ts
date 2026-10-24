@@ -56,11 +56,14 @@ export interface Country {
   whatsappNumber: string;    // blank = use the main number from Settings
   paymentInstructions: string; // blank = use the main text from Settings
   pixelId: string;           // blank = use the main Meta Pixel from Settings
+  /** Typical cost of ONE traditionally-produced video ad in this country's currency (used by the cost-comparison card). 0 = unknown. */
+  tradLow: number;
+  tradHigh: number;
 }
 
 export type SectionKey =
   | 'wall' | 'proof' | 'showcase' | 'clients' | 'problem' | 'services'
-  | 'events' | 'whyUs' | 'process' | 'testimonials' | 'faq' | 'finalCta' | 'liveToasts';
+  | 'events' | 'whyUs' | 'process' | 'testimonials' | 'faq' | 'finalCta' | 'liveToasts' | 'aiCompare';
 
 export interface FeaturedClient {
   name: string;              // short display name, e.g. CirclesFundMe
@@ -103,6 +106,8 @@ export interface SiteContent {
   defaultCountry: string;    // country code shown when a visitor arrives on the plain link
   sections: Record<SectionKey, boolean>;
   client: FeaturedClient;
+  /** The "What AI replaces" cost card under the packages, and the link to the full breakdown page. */
+  aiCompare: { title: string; tradLabel: string; aiLabel: string; body: string; linkText: string };
   popups: { delaySeconds: number; gapSeconds: number; maxPerVisit: number; withinHours: number };
   banner: { enabled: boolean; campaignId: string };
   hero: {

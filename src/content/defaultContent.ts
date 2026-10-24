@@ -8,11 +8,11 @@ const priceMap = (nums: number[]): Record<string, number> => Object.fromEntries(
  * countries are PLACEHOLDERS — set your real prices in Admin → Website → Countries & Prices.
  */
 export const defaultCountries: Country[] = [
-  { code: 'NG', slug: 'ng', name: 'Nigeria', flag: '🇳🇬', currency: 'NGN', symbol: '₦', active: true, prices: priceMap([25000, 35000, 95000, 185000, 250000]), whatsappNumber: '', paymentInstructions: '', pixelId: '' },
-  { code: 'GH', slug: 'gh', name: 'Ghana', flag: '🇬🇭', currency: 'GHS', symbol: 'GH₵', active: true, prices: priceMap([250, 350, 950, 1850, 2500]), whatsappNumber: '', paymentInstructions: 'Mobile Money (MTN MoMo): 024 XXX XXXX — Name: AdVibe Studio. Use your reference code as the payment note, then send proof on WhatsApp.', pixelId: '' },
-  { code: 'KE', slug: 'ke', name: 'Kenya', flag: '🇰🇪', currency: 'KES', symbol: 'KSh', active: true, prices: priceMap([3500, 4900, 13500, 26000, 35000]), whatsappNumber: '', paymentInstructions: 'M-Pesa Paybill XXXXXX, Account: your reference code. Then send the M-Pesa confirmation message on WhatsApp.', pixelId: '' },
-  { code: 'US', slug: 'us', name: 'United States', flag: '🇺🇸', currency: 'USD', symbol: '$', active: true, prices: priceMap([79, 119, 349, 649, 899]), whatsappNumber: '', paymentInstructions: 'We will send you an invoice with a secure payment link on WhatsApp or email. Quote your reference code.', pixelId: '' },
-  { code: 'UK', slug: 'uk', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP', symbol: '£', active: true, prices: priceMap([59, 89, 269, 499, 699]), whatsappNumber: '', paymentInstructions: 'We will send you an invoice with a secure payment link on WhatsApp or email. Quote your reference code.', pixelId: '' },
+  { code: 'NG', slug: 'ng', name: 'Nigeria', flag: '🇳🇬', currency: 'NGN', symbol: '₦', active: true, prices: priceMap([25000, 35000, 95000, 185000, 250000]), whatsappNumber: '', paymentInstructions: '', pixelId: '', tradLow: 100000, tradHigh: 1000000 },
+  { code: 'GH', slug: 'gh', name: 'Ghana', flag: '🇬🇭', currency: 'GHS', symbol: 'GH₵', active: true, prices: priceMap([250, 350, 950, 1850, 2500]), whatsappNumber: '', paymentInstructions: 'Mobile Money (MTN MoMo): 024 XXX XXXX — Name: AdVibe Studio. Use your reference code as the payment note, then send proof on WhatsApp.', pixelId: '', tradLow: 1500, tradHigh: 15000 },
+  { code: 'KE', slug: 'ke', name: 'Kenya', flag: '🇰🇪', currency: 'KES', symbol: 'KSh', active: true, prices: priceMap([3500, 4900, 13500, 26000, 35000]), whatsappNumber: '', paymentInstructions: 'M-Pesa Paybill XXXXXX, Account: your reference code. Then send the M-Pesa confirmation message on WhatsApp.', pixelId: '', tradLow: 20000, tradHigh: 200000 },
+  { code: 'US', slug: 'us', name: 'United States', flag: '🇺🇸', currency: 'USD', symbol: '$', active: true, prices: priceMap([79, 119, 349, 649, 899]), whatsappNumber: '', paymentInstructions: 'We will send you an invoice with a secure payment link on WhatsApp or email. Quote your reference code.', pixelId: '', tradLow: 500, tradHigh: 5000 },
+  { code: 'UK', slug: 'uk', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP', symbol: '£', active: true, prices: priceMap([59, 89, 269, 499, 699]), whatsappNumber: '', paymentInstructions: 'We will send you an invoice with a secure payment link on WhatsApp or email. Quote your reference code.', pixelId: '', tradLow: 400, tradHigh: 4000 },
 ];
 
 export const defaultContent: SiteContent = {
@@ -36,7 +36,7 @@ export const defaultContent: SiteContent = {
   defaultCountry: 'NG',
   sections: {
     wall: true, proof: true, showcase: true, clients: true, problem: true, services: true,
-    events: true, whyUs: true, process: true, testimonials: true, faq: true, finalCta: true, liveToasts: true,
+    events: true, whyUs: true, process: true, testimonials: true, faq: true, finalCta: true, liveToasts: true, aiCompare: true,
   },
   client: {
     name: 'CirclesFundMe',
@@ -50,13 +50,20 @@ export const defaultContent: SiteContent = {
     points: ['Many campaigns delivered', 'A repeat client — they keep coming back'],
     matchName: 'CirclesFundMe',
   },
+  aiCompare: {
+    title: 'Making one video ad',
+    tradLabel: 'Traditional production',
+    aiLabel: 'Made with AdVibe',
+    body: 'No studio rental, no camera crew and no equipment to buy. One price covers the script, AI visuals, voiceover and editing.',
+    linkText: 'AI video ads: the full breakdown',
+  },
   popups: { delaySeconds: 8, gapSeconds: 16, maxPerVisit: 6, withinHours: 72 },
   banner: { enabled: true, campaignId: 'black-friday' },
   hero: {
     headline: 'Ads that turn attention into orders.',
     subheadline:
       'We turn your product into scroll-stopping AI video ads for Facebook, Instagram, TikTok and WhatsApp Status — ready in 5 days, so you are never late for a sales season.',
-    primaryCta: 'Get my video ad',
+    primaryCta: 'Chat with our team on WhatsApp and get a free strategy session.',
     secondaryCta: 'See our work',
     stats: [
       { value: '120+', label: 'videos delivered' },
@@ -215,7 +222,7 @@ export const defaultContent: SiteContent = {
   finalCta: {
     heading: 'Your next sale starts with one good video.',
     subheading: 'Tell us what you are selling. We will handle the rest.',
-    primaryCta: 'Get my video ad',
+    primaryCta: 'Chat with our team on WhatsApp and get a free strategy session.',
   },
 };
 
