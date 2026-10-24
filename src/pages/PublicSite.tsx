@@ -4,6 +4,7 @@ import { useStore } from '@/lib/store';
 import { CountryProvider } from '@/lib/country';
 import { Nav, Hero, Proof, Showcase, StickyBar } from '@/sections/chrome';
 import { Problem, Services, Events, Pricing, WhyUs, Process, Testimonials, Faq, FinalCta, Footer, ClientSpotlight } from '@/sections/sections';
+import { CostCompare } from '@/sections/CostCompare';
 import { Lightbox } from '@/components/shared';
 
 // The order form and the "just started" pop-ups are separate small downloads, fetched quietly
@@ -11,6 +12,7 @@ import { Lightbox } from '@/components/shared';
 const loadOrderModal = () => import('@/components/OrderModal').then((m) => ({ default: m.OrderModal }));
 const OrderModal = lazy(loadOrderModal);
 const LivePopups = lazy(() => import('@/components/LivePopups'));
+const StrategyModal = lazy(() => import('@/components/StrategyModal').then((m) => ({ default: m.StrategyModal })));
 
 function Page() {
   const { content } = useStore();
@@ -20,12 +22,21 @@ function Page() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [orderEvent, setOrderEvent] = useState<string>('');
   const [popupsReady, setPopupsReady] = useState(false);
+  const [strategyOpen, setStrategyOpen] = useState(false);
 
   useEffect(() => {
     const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
     const t = idle ? idle(() => { void loadOrderModal(); }) : window.setTimeout(() => { void loadOrderModal(); }, 3000);
     const p = window.setTimeout(() => setPopupsReady(true), 4000);
     return () => { if (!idle) clearTimeout(t); clearTimeout(p); };
+  }, []);
+
+  // Coming back from the "AI video ads" page: jump to the top, or to the work gallery.
+  useEffect(() => {
+    let where = '';
+    try { where = sessionStorage.getItem('advibe.jump') ?? ''; sessionStorage.removeItem('advibe.jump'); } catch { /* ignore */ }
+    if (where === 'top') window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    if (where === 'work') setTimeout(() => document.getElementById('work')?.scrollIntoView({ behavior: 'smooth' }), 250);
   }, []);
 
   useEffect(() => {
@@ -43,7 +54,7 @@ function Page() {
     <div className="studio" style={{ minHeight: '100dvh' }}>
       <Nav onOrder={() => openOrder()} />
       <main>
-        <Hero onOrder={() => openOrder()} onPlay={setPlaying} />
+        <Hero onOrder={() => openOrder()} onStrategy={() => setStrategyOpen(true)} onPlay={setPlaying} />
         {sec.proof && <Proof />}
         {sec.showcase && <Showcase onPlay={setPlaying} />}
         {sec.clients && <ClientSpotlight onPlay={setPlaying} />}
@@ -51,18 +62,20 @@ function Page() {
         {sec.services && <Services />}
         {sec.events && <Events onOrder={(ev) => openOrder(undefined, ev)} />}
         <Pricing onChoose={(o) => openOrder(o)} />
+        {sec.aiCompare && <CostCompare />}
         {sec.whyUs && <WhyUs />}
         {sec.process && <Process />}
         {sec.testimonials && <Testimonials />}
         {sec.faq && <Faq />}
-        {sec.finalCta && <FinalCta onOrder={() => openOrder()} />}
+        {sec.finalCta && <FinalCta onStrategy={() => setStrategyOpen(true)} />}
       </main>
       <Footer />
-      <StickyBar onOrder={() => openOrder()} />
+      <StickyBar onStrategy={() => setStrategyOpen(true)} />
       <Lightbox item={playing} onClose={() => setPlaying(null)} />
       {sec.liveToasts && popupsReady && (
         <Suspense fallback={null}><LivePopups paused={orderOpen || Boolean(playing)} /></Suspense>
       )}
+      {strategyOpen && <Suspense fallback={null}><StrategyModal onClose={() => setStrategyOpen(false)} /></Suspense>}
       {orderOpen && (
         <Suspense fallback={<div className="overlay"><div className="modal" style={{ textAlign: 'center', color: 'rgb(var(--muted))' }}>Loading…</div></div>}>
           <OrderModal
