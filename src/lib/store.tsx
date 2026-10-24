@@ -58,7 +58,13 @@ function withDefaults(c: Partial<SiteContent> | null | undefined): SiteContent {
     sections: { ...defaultContent.sections, ...(c.sections ?? {}) },
     client: { ...defaultContent.client, ...(c.client ?? {}) },
     popups: { ...defaultContent.popups, ...(c.popups ?? {}) },
+    aiCompare: { ...defaultContent.aiCompare, ...(c.aiCompare ?? {}) },
   } as SiteContent;
+
+  // The call-to-action wording changed: sites still using the OLD default wording get the new one
+  // (anything you typed yourself is left alone).
+  if (merged.hero.primaryCta === 'Get my video ad') merged.hero.primaryCta = defaultContent.hero.primaryCta;
+  if (merged.finalCta?.primaryCta === 'Get my video ad') merged.finalCta = { ...merged.finalCta, primaryCta: defaultContent.finalCta.primaryCta };
 
   if (!c.countries?.length) {
     const ngPrices = Object.fromEntries((c.offers ?? []).map((o) => [o.id, o.price]));
@@ -72,6 +78,15 @@ function withDefaults(c: Partial<SiteContent> | null | undefined): SiteContent {
       ...defaultContent.campaigns.filter((x) => !have.has(x.id)),
     ];
   }
+  // countries saved before the cost card existed get the starter "typical cost" estimates
+  merged.countries = merged.countries.map((k) => {
+    const def = defaultCountries.find((x) => x.code === k.code);
+    return {
+      ...k,
+      tradLow: typeof k.tradLow === 'number' ? k.tradLow : def?.tradLow ?? 0,
+      tradHigh: typeof k.tradHigh === 'number' ? k.tradHigh : def?.tradHigh ?? 0,
+    };
+  });
   merged.defaultCountry = c.defaultCountry || 'NG';
   return merged;
 }
@@ -288,7 +303,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           offerId: input.offerId, offerName: input.offerName, price: input.price,
           industry: input.industry, product: input.product, event: input.event,
           notes: input.notes, utmSource: input.utmSource ?? null,
-          countryCode: input.country, currency: input.currency, showPublic: input.showPublic,
+          countryCode: input.country, currency: input.currency, showPublic: input.showPublic, source: input.source,
         });
       } catch (err) {
         console.error('submit_lead failed', err);
@@ -304,7 +319,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
     if (!isLive) setLeads((ls) => [full, ...ls]);
     sendLeadToMake(full, countryName);
-    track('Lead', { value: full.price, currency: full.currency, content_name: full.offerName });
+    // A strategy-session request has no price, so it is sent to Meta as a Lead WITHOUT a value (keeps your ad value data clean).
+    track('Lead', {
+      ...(full.price > 0 ? { value: full.price, currency: full.currency } : {}),
+      content_name: full.offerName,
+      content_category: full.source === 'strategy' ? 'strategy' : 'order',
+    });
     return full;
   }, []);
 

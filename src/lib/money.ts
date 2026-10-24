@@ -38,3 +38,18 @@ export const payTextFor = (mainText: string, c: Pick<Country, 'paymentInstructio
 /** A picture/file path from Admin: full web addresses are used as-is; site paths like "clients/logo.webp" get the site's base path. */
 export const assetUrl = (u: string) =>
   /^(https?:)?\/\//.test(u) ? u : `${import.meta.env.BASE_URL}${u.replace(/^\//, '')}`;
+
+/** The lowest–highest price of ONE video with us in a country (from the single-video packages; falls back to price-per-video). */
+export function ourRange(offers: Offer[], c: Country): { low: number; high: number } | null {
+  const active = offers.filter((o) => o.active);
+  const isNum = (x: number | undefined): x is number => typeof x === 'number' && x > 0;
+  const singles = active.filter((o) => o.goal === 'one' && o.quantity <= 1).map((o) => priceFor(o, c)).filter(isNum);
+  if (singles.length) return { low: Math.min(...singles), high: Math.max(...singles) };
+  const per = active.map((o) => { const p = priceFor(o, c); return p ? Math.round(p / Math.max(1, o.quantity)) : undefined; }).filter(isNum);
+  return per.length ? { low: Math.min(...per), high: Math.max(...per) } : null;
+}
+export const rangeText = (r: { low: number; high: number }, c: Pick<Country, 'symbol'>) =>
+  r.low === r.high ? fmtMoney(r.low, c) : `${fmtMoney(r.low, c)}–${fmtMoney(r.high, c).replace(/^[^\d]+/, '')}`;
+
+/** "United Kingdom" -> "the United Kingdom" (for use inside sentences). */
+export const withThe = (name: string) => (/^United /.test(name) ? `the ${name}` : name);
